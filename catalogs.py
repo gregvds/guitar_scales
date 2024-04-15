@@ -7,6 +7,39 @@
 # ࿄ ࿅ ࿇
 # -----------------------------------------------------------------------------
 
+from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsRectItem
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPen
+
+class NoBroderEllipseItem(QGraphicsEllipseItem):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # Set the pen to transparent color (no border)
+        self.setPen(QPen(Qt.transparent))
+
+class NoBroderRectItem(QGraphicsRectItem):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # Set the pen to transparent color (no border)
+        self.setPen(QPen(Qt.transparent))
+
+notes = {
+"C" : 0,
+"C♯": 1,
+"D" : 2,
+"D♯": 3,
+"E" : 4,
+"F" : 5,
+"F♯": 6,
+"G" : 7,
+"G♯": 8,
+"A" : 9,
+"A♯": 10,
+"B" : 11
+}
+
 scales = {
 "Natural"                   : [0, 2, 4, 5, 7, 9, 11],
 "Harmonic"                  : [0, 2, 3, 5, 7, 8, 11],
@@ -121,14 +154,13 @@ chords = {
 (0, 3, 7, 9): {"name": "Minor 6", "notation": "m6"}
 }
 
-
 tunings = {
 "Standard 6 \tEADGBE"    : (0, 5, 10, 15, 19, 24),
 "Drop D 6 \tDADGBE"      : (0, 7, 12, 17, 21, 26),
 "open 6 \tDGDGBD"        : (0, 5, 12, 17, 21, 24),
 "Standard 7 \tBEADGBE"   : (0, 5, 10, 15, 20, 24, 29),
 "Drop A 7 \tAEADGBE"     : (0, 7, 12, 17, 22, 26, 31),
-"Standard 8 \tF#BEADGBE" : (0, 5, 10, 15, 20, 25, 29, 34),
+"Standard 8 \tF♯BEADGBE" : (0, 5, 10, 15, 20, 25, 29, 34),
 "A-Tuning 8 \tADGCFADG"  : (0, 5, 10, 15, 20, 24, 29, 34),
 "Drop E 8 \tEBEADGBE"    : (0, 7, 12, 17, 22, 27, 31, 36),
 "Drop D 8 \tDADGCFAD"    : (0, 7, 12, 17, 22, 27, 31, 36)
@@ -151,6 +183,102 @@ stringSets = {
 ".strandberg＊ 7" : (9.5, 13, 16, 24, 34, 46, 64),
 ".standberg＊ 8"  : (9, 12, 15, 22, 30, 42, 56, 84)
 }
+
+inlaysGeneralParameters = {
+"black_dot": {
+    'type': NoBroderEllipseItem,
+    'color': Qt.black,
+    'size_x': 20,
+    'size_y': 20,
+    'delta_x': 0.5,
+    'delta_y': 0.0},
+"white_dot": {
+    'type': NoBroderEllipseItem,
+    'color': Qt.white,
+    'size_x': 25,
+    'size_y': 25,
+    'delta_x': 0.5,
+    'delta_y': 0.0},
+".strandberg＊": {
+    'type': QGraphicsEllipseItem,
+    'color': Qt.white,
+    'size_x': 8,
+    'size_y': 8,
+    'delta_x': 0.5,
+    'delta_y': 0.8},
+"Celeste": {
+    'type': NoBroderRectItem,
+    'color': QColor(234, 202, 164),
+    'size_x': 7,
+    'size_y': 40,
+    'delta_x': 0.5,
+    'delta_y': 0.8},
+"Millimetric": {
+    'type': NoBroderRectItem,
+    'color': Qt.black,
+    'size_x': 2,
+    'size_y': 45,
+    'delta_x': 0.5,
+    'delta_y': 0.76},
+}
+
+inlaymarkings = {
+2: 1,
+4: 1,
+6: 1,
+8: 1,
+11: 2,
+14: 1,
+16: 1,
+18: 1,
+20: 1,
+23: 2
+}
+
+# based on the generic inlay of each type, we generate all the inlays for every
+# position on the neck
+inlays = {}
+for inlayType in inlaysGeneralParameters.keys():
+    inlays[inlayType] = {}
+    for inlaymarking in inlaymarkings.keys():
+        inlays[inlayType][inlaymarking] = []
+        for i in range(inlaymarkings[inlaymarking]):
+            inlays[inlayType][inlaymarking].append({})
+            for param in inlaysGeneralParameters[inlayType].keys():
+                inlays[inlayType][inlaymarking][i][param] = inlaysGeneralParameters[inlayType][param]
+
+# and according to each type, we tune the positions and or size of certain inlays
+inlays["black_dot"][11][0]['delta_y'] = 0.75
+inlays["black_dot"][11][1]['delta_y'] = -0.75
+inlays["black_dot"][23][0]['delta_y'] = 0.75
+inlays["black_dot"][23][1]['delta_y'] = -0.75
+
+inlays["white_dot"][11][0]['delta_y'] = 0.75
+inlays["white_dot"][11][1]['delta_y'] = -0.75
+inlays["white_dot"][23][0]['delta_y'] = 0.75
+inlays["white_dot"][23][1]['delta_y'] = -0.75
+
+inlays[".strandberg＊"][11][1]['delta_y'] = inlays[".strandberg＊"][11][1]['delta_y']-0.4
+inlays[".strandberg＊"][14][0]['delta_y'] = -inlays[".strandberg＊"][14][0]['delta_y']
+inlays[".strandberg＊"][16][0]['delta_y'] = -inlays[".strandberg＊"][16][0]['delta_y']
+inlays[".strandberg＊"][18][0]['delta_y'] = -inlays[".strandberg＊"][18][0]['delta_y']
+inlays[".strandberg＊"][20][0]['delta_y'] = -inlays[".strandberg＊"][20][0]['delta_y']
+inlays[".strandberg＊"][23][0]['delta_y'] = -inlays[".strandberg＊"][23][0]['delta_y']
+inlays[".strandberg＊"][23][1]['delta_y'] = -(inlays[".strandberg＊"][23][1]['delta_y']-0.4)
+
+inlays["Celeste"][11][0]['size_y'] = inlays["Celeste"][11][0]['size_y']*1.7
+inlays["Celeste"][11][1]['size_y'] = inlays["Celeste"][11][1]['size_y']*1.7
+inlays["Celeste"][11][0]['delta_y'] = inlays["Celeste"][11][0]['delta_y']-0.18
+inlays["Celeste"][11][1]['delta_y'] = -(inlays["Celeste"][11][1]['delta_y']-0.18)
+inlays["Celeste"][23][1]['delta_y'] = -inlays["Celeste"][23][1]['delta_y']
+
+inlays["Millimetric"][11][0]['delta_x'] -= 0.17
+inlays["Millimetric"][11][1]['delta_x'] += 0.17
+inlays["Millimetric"][23][0]['delta_x'] -= 0.17
+inlays["Millimetric"][23][1]['delta_x'] += 0.17
+
+inlays["None"]= {}
+
 
 degrees = ("I", "II", "III", "IV", "V", "VI", "VII")
 

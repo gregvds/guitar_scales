@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QDialog, QPushButton, QRadioButton, QComboBox, QMe
 from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
 from PySide6.QtGui import QPolygonF, QPen, QPainter, QAction, QFont, QColor
 import math
-from catalogs import scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements
+from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements, inlays
 
 # -----------------------------------------------------------------------------
 SCALE_CIRCLE_RADIUS = 160
@@ -35,6 +35,7 @@ class NeckWindow(QDialog):
         self.once = True
         self.neckSceneRect = ''
         self.scaleName = ""
+        self.rootNote = ''
         self.shownScale = list()
         self.scaleLength = 0
 
@@ -42,12 +43,14 @@ class NeckWindow(QDialog):
         self.currentArrangement = (1,)
         self.referenceDegree = 0
 
-        self.num_frets = 20
-        self.first_root_position = 4
+        self.num_frets = 24
+        self.first_root_position = -1
         self.num_strings = 0
 
         # Add neck_graphics_view to layout
         self.mainVBoxLayout = QVBoxLayout()
+        self.topHBoxLayout = QHBoxLayout()
+        self.mainVBoxLayout.addLayout(self.topHBoxLayout)
 
         self.neck_graphics_view = QGraphicsView()
         self.neck_graphics_view.viewport().setAutoFillBackground(True)
@@ -58,11 +61,12 @@ class NeckWindow(QDialog):
         self.neck_scene = QGraphicsScene()
         self.neck_graphics_view.setScene(self.neck_scene)
 
-        # Create a radio button
-        self.show_root_radio_button = QRadioButton("Roots")
-        self.show_root_radio_button.setChecked(True)
-        self.show_root_radio_button.toggled.connect(self.draw_notes_on_neck)
-        self.mainVBoxLayout.addWidget(self.show_root_radio_button)
+        # Create a radio button to toggle showing the root notes
+        self.create_show_root_button()
+        #create the combobox to choose the note for the root
+        self.create_root_note_combobox()
+        #create the inlays combobox
+        self.create_inlays_combobox()
 
 
         self.mainVBoxLayout.addWidget(self.neck_graphics_view)
@@ -80,16 +84,32 @@ class NeckWindow(QDialog):
         # Enable antialiasing
         self.neck_graphics_view.setRenderHint(QPainter.Antialiasing)
 
+# -----------------------------------------------------------------------------
+
     def set_tuning(self, tuning_name, init=False):
         '''
         Takes a tuning name and set it
         If not in init phase, the entire neck is redrawn
         '''
-        self.currentTuning = tunings[tuning_name]
+        self.currentTuningName = tuning_name
+        self.currentTuning = tunings[self.currentTuningName]
         self.num_strings = len(self.currentTuning)
+
+
+        # All this will be useful to draw a more realistic neck
+        tuningNotesComposition = tuning_name.split('\t')[1].split()
+        print(tuningNotesComposition)
+        firstTuningNote = ''
+        if len(tuningNotesComposition)>0 and tuningNotesComposition[0][1] == '♯':
+            firstTuningNote = tuningNotesComposition[0][0]+tuningNotesComposition[0][1]
+        else:
+            firstTuningNote = tuningNotesComposition[0][0]
+        print("\nIn set_tuning of NeckWindow, firstTuningNote: %s" % firstTuningNote)
+
         if not init:
-            self.draw_notes_on_neck()
-            self.label_degrees_on_neck()
+            self.setRootNote()
+            #self.draw_notes_on_neck()
+            #self.label_degrees_on_neck()
 
     def set_scale(self, scale_name):
         '''
@@ -115,6 +135,49 @@ class NeckWindow(QDialog):
         #print(arrangement)
         self.label_degrees_on_neck()
 
+    def setRootNote(self):
+        # All this will be useful to draw a more realistic neck
+        tuningNotesComposition = self.currentTuningName.split('\t')[1].split()
+        print(tuningNotesComposition)
+        firstTuningNote = ''
+        if len(tuningNotesComposition)>0 and tuningNotesComposition[0][1] == '♯':
+            firstTuningNote = tuningNotesComposition[0][0]+tuningNotesComposition[0][1]
+        else:
+            firstTuningNote = tuningNotesComposition[0][0]
+
+        firstTuningNoteValue = notes[firstTuningNote]
+        rootNoteValue = notes[self.root_note_combobox.currentText()]
+        print('\nIn setRootNote: firstTuningNoteValue: %s' % firstTuningNoteValue)
+        print('\nIn setRootNote: rootNoteValue: %s' % rootNoteValue)
+        self.first_root_position = (rootNoteValue - firstTuningNoteValue)-1
+        self.draw_notes_on_neck()
+        self.label_degrees_on_neck()
+
+# -----------------------------------------------------------------------------
+
+    def create_show_root_button(self):
+        self.show_root_radio_button = QRadioButton("Roots")
+        self.show_root_radio_button.setChecked(True)
+        self.show_root_radio_button.toggled.connect(self.draw_notes_on_neck)
+        self.topHBoxLayout.addWidget(self.show_root_radio_button)
+
+    def create_root_note_combobox(self):
+        self.root_note_combobox = QComboBox()
+        self.root_note_combobox.addItems(notes.keys())
+        self.rootNote = "E"
+        self.root_note_combobox.setCurrentText(self.rootNote)
+        self.root_note_combobox.currentTextChanged.connect(lambda: self.setRootNote())
+        #self.root_note_combobox.highlighted.connect(self.setRootNote)
+        self.topHBoxLayout.addWidget(self.root_note_combobox)
+
+    def create_inlays_combobox(self):
+        self.inlays_combobox = QComboBox()
+        self.inlays_combobox.addItems(inlays.keys())
+        self.inlays_combobox.setCurrentText(".strandberg＊")
+        self.inlays_combobox.currentTextChanged.connect(lambda: self.draw_notes_on_neck())
+        #self.root_note_combobox.highlighted.connect(self.setRootNote)
+        self.topHBoxLayout.addWidget(self.inlays_combobox)
+
     def move_root_index(self, direction):
         '''
         Unused currently. Moves the root notes
@@ -135,7 +198,7 @@ class NeckWindow(QDialog):
                     if note[0].contains(event.scenePos()):
                         print("Clicked on %s situated in x: %s - y: %s!"%(note[1], note[2], note[3]))
 
-    def draw_neck_background(self):
+    def draw_neck_background(self, rootUndefined=True):
         '''
         Draws the strings and frets background canvas
         '''
@@ -149,12 +212,39 @@ class NeckWindow(QDialog):
         # Draw strings
         string_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         string_darkGray_pen.setWidth(1)      # Set the pen width
+
+        #Draw borders of neck
+        fretOvershoot = FRET_OVERSHOOT+1
+        top = QGraphicsLineItem(-15, -fretOvershoot, neck_width, -fretOvershoot)
+        bottom = QGraphicsLineItem(-15, neck_height+fretOvershoot, neck_width, neck_height+fretOvershoot)
+        string_darkGray_pen.setWidth(0.5)
+        top.setPen(string_darkGray_pen)
+        bottom.setPen(string_darkGray_pen)
+        self.neck_diagram_background_group.addToGroup(top)
+        self.neck_diagram_background_group.addToGroup(bottom)
+
+        # Draw inlays
+        self.draw_inlays(type=self.inlays_combobox.currentText()) #.strandberg＊
+
         for i in range(self.num_strings):
             y = i * STRING_SPACING
-            line = QGraphicsLineItem(0, y, neck_width, y)
+            line = QGraphicsLineItem(-15, y, neck_width, y)
             string_darkGray_pen.setWidth(strings_thickness[i]/10.0)
             line.setPen(string_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
+
+        # Draw fret 0 and nut
+        fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
+        fret_darkGray_pen.setWidth(4)      # Set the pen width
+        line = QGraphicsLineItem(0, -FRET_OVERSHOOT, 0, neck_height+FRET_OVERSHOOT)
+        line.setPen(fret_darkGray_pen)
+        self.neck_diagram_background_group.addToGroup(line)
+
+        fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
+        fret_darkGray_pen.setWidth(10)      # Set the pen width
+        line = QGraphicsLineItem(-15, -FRET_OVERSHOOT+4, -15, neck_height+FRET_OVERSHOOT-4)
+        line.setPen(fret_darkGray_pen)
+        self.neck_diagram_background_group.addToGroup(line)
 
         # Draw frets
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
@@ -165,8 +255,22 @@ class NeckWindow(QDialog):
             line.setPen(fret_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
+
         if self.neck_diagram_background_group not in self.neck_scene.items():
             self.neck_scene.addItem(self.neck_diagram_background_group)
+
+    def draw_inlays(self, type="black_dot"):
+        neck_height = STRING_SPACING * (self.num_strings - 1)
+        localInlays = inlays
+        for i in range(0, self.num_frets):
+            if i in localInlays[type].keys():
+                for inlayMark in localInlays[type][i]:
+                    x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
+                    y = neck_height/2 + neck_height/2*inlayMark['delta_y']
+                    point = QPointF(x, y)
+                    inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
+                    inlay.setBrush(inlayMark['color'])
+                    self.neck_diagram_background_group.addToGroup(inlay)
 
     def draw_notes_on_neck(self):
         '''
@@ -191,7 +295,7 @@ class NeckWindow(QDialog):
         for i in range(self.num_strings):
             y = neck_height - (i * string_spacing)
             # from low to high frets
-            for j in range(1, self.num_frets):
+            for j in range(0, self.num_frets):
                 x = (fret_spacing/2.0) + j * fret_spacing
                 semitone_text = (self.currentTuning[i] + j) - self.first_root_position
                 if semitone_text%12 in self.shownScale:
@@ -202,7 +306,6 @@ class NeckWindow(QDialog):
                         triangle.append(QPointF(string_spacing, string_spacing))  # Bottom right point
                         triangle.append(QPointF(0, string_spacing))  # Bottom left point
                         note_point = QGraphicsPolygonItem(triangle)
-                        #note_point.setBrush(Qt.black)
                         note_point.setPos(x-string_spacing/2.0, y-string_spacing/2.0)
                     else:
                         note_point = QGraphicsEllipseItem(QRectF(point - QPointF(string_spacing/2.0, string_spacing/2.0), QSizeF(string_spacing, string_spacing)))
@@ -267,6 +370,7 @@ class NeckWindow(QDialog):
         self.center_neck_view()
 
 # -----------------------------------------------------------------------------
+
     def clear_group(self, group):
         '''
         remove all the item from a group and remove the group from the scene
@@ -280,10 +384,18 @@ class NeckWindow(QDialog):
             self.neck_scene.removeItem(group)
 
     def color_notes_by_default(self):
-        black_pen = QPen(Qt.black)
+        transblack = QColor(Qt.black)
+        transblack.setAlpha(128)
+        trans = QColor(Qt.black)
+        trans.setAlpha(255)
+        transblack_pen = QPen(trans)
+        transblack_pen.setColor(trans)
         gray_pen = QPen(Qt.gray)
         for note in self.identifiedNotes.keys():
             for (note_point, semitone_text, string, fret) in self.identifiedNotes[note]:
+                note_point.setBrush(transblack)
+                note_point.setPen(transblack_pen)
+                '''
                 if self.first_root_position <= fret <= self.num_frets - self.first_root_position:
                     note_point.setBrush(Qt.black)
                     note_point.setPen(black_pen)
@@ -295,6 +407,7 @@ class NeckWindow(QDialog):
                     blur_radius = (self.first_root_position - fret) if (fret < self.first_root_position) else (fret - (self.num_frets - self.first_root_position))
                     blur_effect.setBlurRadius(blur_radius*10)
                     note_point.setGraphicsEffect(blur_effect)
+                '''
 
     def color_degrees(self):
         black_pen = QPen(Qt.black)
@@ -354,6 +467,21 @@ class NeckWindow(QDialog):
 
 
 
+class NoteItem(QGraphicsEllipseItem):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptHoverEvents(True)
+
+    def hoverEnterEvent(self, event):
+        # Function to execute when mouse enters the ellipse
+        print("Mouse entered the ellipse")
+        # Add your desired functionality here
+
+    def hoverLeaveEvent(self, event):
+        # Function to execute when mouse leaves the ellipse
+        print("Mouse left the ellipse")
+        # Add your desired functionality here
+
 class CircleAndNeckVBoxFrame(QFrame):
     def __init__(self, topApp, degree, visible=False, name="frame0"):
         super().__init__()
@@ -378,6 +506,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.scaleName = ""
         self.shownScale = list()
         self.scaleLength = 0
+        self.notesOnCircle = {}
 
         if visible:
             self.show()
@@ -397,6 +526,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         palette.setColor(self.circle_graphics_view.viewport().backgroundRole(), Qt.lightGray)
         self.circle_graphics_view.viewport().setPalette(palette)
         self.circle_scene = QGraphicsScene()
+        #self.circle_scene.setAcceptHoverEvents(True)
         self.circle_graphics_view.setScene(self.circle_scene)
         #self.circle_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH, GRAPHICSVIEW_HEIGHT)
         self.thisVBoxLayout.addWidget(self.circle_graphics_view)
@@ -424,6 +554,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         # Groups to hold graphical parts such as general background, note points, line items and center pivot
         self.scale_circle_background = QGraphicsItemGroup()
         self.notes_group = QGraphicsItemGroup()
+        self.notes_group.setHandlesChildEvents(False)
         self.scale_circle_center_group = QGraphicsItemGroup()
         self.neck_diagram_background_group = QGraphicsItemGroup()
         self.neck_diagram_notes_group = QGraphicsItemGroup()
@@ -543,8 +674,12 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def set_degree(self, degreeIndex, movingRef=False):
         #print("\nIn set_degree of %s to set degree to %s for %s moving reference" % (self.name, degreeIndex, movingRef))
+        print("\nIn set_degree of frame %s to set degreeIndex %s when movingRef %s" % (self.name, degreeIndex, movingRef))
         if not movingRef:
+            print("\nIn set_degree of frame %s to set degreeIndex %s with self.referenceDegree %s" % (self.name, degreeIndex, self.referenceDegree))
             degreeIndex = (degreeIndex + (self.referenceDegree - 1))%self.scaleLength
+            print("\nIn set_degree of frame %s to set degreeIndex %s" % (self.name, degreeIndex))
+
         currentDegreeIndex = self.currentDegree-1
         #print("In set_degree of %s, currentDegreeIndex: %s --- degreeIndex:%s" % (self.name, currentDegreeIndex, degreeIndex))
         if currentDegreeIndex > degreeIndex:
@@ -560,10 +695,10 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.draw_scale()
             self.draw_notes_on_neck()
         self.currentDegree = degreeIndex+1
-        #print("In set_degree of %s, current after: %s" % (self.name, self.currentDegree))
+        print("In set_degree of %s, current after: %s" % (self.name, self.currentDegree))
 
     def set_reference_degree(self, degreeName, degreeIndex):
-        #print("\nIn set_reference_degree of %s to set reference to %s with index %s" % (self.name, degreeName, degreeIndex))
+        print("\nIn set_reference_degree of %s to set reference to %s with index %s" % (self.name, degreeName, degreeIndex))
         #print("In set_reference_degree of %s, reference and current before: %s --- %s" % (self.name, self.referenceDegree, self.currentDegree))
         deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.referenceDegree-1)
         CurrentDegreeToSet = (degreeIndex+deltaCurrentDegreeToReference)%self.scaleLength
@@ -571,8 +706,8 @@ class CircleAndNeckVBoxFrame(QFrame):
         #print("In set_reference_degree of %s, current degree to set: %s" % (self.name, CurrentDegreeToSet))
         self.referenceDegree = degreeIndex+1
         self.set_degree(CurrentDegreeToSet, movingRef=True)
-        #print("In set_reference_degree of %s, reference after: %s" % (self.name, self.referenceDegree))
-        #print("In set_reference_degree of %s, current after: %s" % (self.name, self.currentDegree))
+        print("In set_reference_degree of %s, reference after: %s" % (self.name, self.referenceDegree))
+        print("In set_reference_degree of %s, current after: %s" % (self.name, self.currentDegree))
 
     def draw_scale_circle(self):
         center = QPointF(0, 0)
@@ -642,6 +777,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.clear_group(self.notes_group)
         self.clear_group(self.scale_circle_center_group)
 
+
         for angle, noteSize, note in zip(angles, noteSizes, scale):
             x = center.x() + radius * math.sin(angle)
             y = center.y() - radius * math.cos(angle)
@@ -657,13 +793,14 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.notes_group.addToGroup(line_item)
 
             # Draw note point
-            note_point = QGraphicsEllipseItem(QRectF(point - QPointF(noteSize/2.0, noteSize/2.0), QSizeF(noteSize, noteSize)))
+            note_point = NoteItem(QRectF(point - QPointF(noteSize/2.0, noteSize/2.0), QSizeF(noteSize, noteSize)))
             note_colour = self.color_for_angle(angle)
             note_point.setBrush(note_colour) #Qt.white
             note_point.setPen(pen)
+            note_point.setAcceptHoverEvents(True)
             self.notes_group.addToGroup(note_point)
 
-            self.notesOnCircle[note].append((line_item, note_colour))
+            self.notesOnCircle[note].append((note_point, line_item, note_colour))
 
         if self.notes_group not in self.circle_scene.items():
             self.circle_scene.addItem(self.notes_group)
@@ -704,8 +841,6 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def draw_notes_on_neck(self):
         if self.once:
-            print("\nIn draw_notes_on_neck, Once, sceneRect: ")
-            print(self.neck_scene.sceneRect())
             self.neckSceneRect = self.neck_scene.sceneRect()
 
         self.num_strings = len(self.currentTuning)
@@ -875,6 +1010,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         if group in self.neck_scene.items():
             self.neck_scene.removeItem(group)
 
+
     def color_notes_by_default(self):
         #print('color by default with %s strings defined' % self.num_strings)
         black_pen = QPen(Qt.black)
@@ -892,7 +1028,7 @@ class CircleAndNeckVBoxFrame(QFrame):
                 text_item.setBrush(Qt.white)
             #for (text_item, semitone_text, string, fret) in self.identifiedNoteTexts[note]:
             #    text_item.setBrush(Qt.white)
-            for (line_item, note_colour) in self.notesOnCircle[self.shownScale[note%self.scaleLength]]:
+            for (note_point, line_item, note_colour) in self.notesOnCircle[self.shownScale[note%self.scaleLength]]:
                 colour_pen = QPen(Qt.black)
                 colour_pen.setWidth(1)
                 line_item.setPen(colour_pen)
@@ -926,7 +1062,7 @@ class CircleAndNeckVBoxFrame(QFrame):
                 # we reserve that string for that note
                 reserved_string_for_note[notes_potential_positions[note][0][0]] = note
 
-            for (line_item, note_colour) in self.notesOnCircle[note]:
+            for (note_point, line_item, note_colour) in self.notesOnCircle[note]:
                 colour_pen = QPen(note_colour)
                 colour_pen.setWidth(2)
                 line_item.setPen(colour_pen)
@@ -1067,7 +1203,7 @@ class MainWindow(QMainWindow):
 # -----------------------------------------------------------------------------
 
     def set_arrangement(self, arrangement, arrIndex):
-        #print("\nIn set_arrangement to set %s with arrIndex %s" % (arrangement, arrIndex))
+        print("\nIn set_arrangement to set %s with arrIndex %s" % (arrangement, arrIndex))
         self.arrangementString = arrangement
         self.arrangement = degreeArrangements[arrIndex]
         self.clearDegreeFrames()
@@ -1075,15 +1211,19 @@ class MainWindow(QMainWindow):
         for i in range(len(self.arrangement)):
             name = "frame_%s"%(1+i)
             self.addDegreeFrame(name=name)
+        self.set_reference_degree(self.reference_degree_combobox.currentText(), self.reference_degree_combobox.currentIndex())
         for i in range(len(self.arrangement)):
-            #print("In set_arrangement to set degree: %s called %s" % (self.arrangement[i], degrees[self.arrangement[i]-1]))
+            print("In set_arrangement to set degree: %s called %s" % (self.arrangement[i], degrees[self.arrangement[i]-1]))
+            print("In set_arrangement with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
             self.degreesFrames[i].show()
+            print('In set_arrangement, frame %s with reference degree %s' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
             self.degreesFrames[i].set_degree(self.arrangement[i]-1)
         if not self.neckGeneralView == "":
             self.neckGeneralView.set_arrangement(self.arrangement)
 
     def set_reference_degree(self, degreeName, degreeIndex):
         self.referenceDegreeIndex = degreeIndex
+        print("In set_reference_degree with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
         for vFrame in self.degreesFrames:
             vFrame.set_reference_degree(degreeName, degreeIndex)
         if not self.neckGeneralView == "":
@@ -1132,7 +1272,7 @@ class MainWindow(QMainWindow):
         self.degreesFrames = list()
 
     def addDegreeFrame(self, visible=False, name=""):
-        print("\nIn addDegreeFrame...")
+        #print("\nIn addDegreeFrame...")
         vBoxFrame = CircleAndNeckVBoxFrame(self, 1, visible=visible, name=name)
         self.degreesFrames.append(vBoxFrame)
         vBoxFrame.setFixedSize(483, 834)
