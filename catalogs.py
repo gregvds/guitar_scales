@@ -184,6 +184,9 @@ stringSets = {
 ".standberg＊ 8"  : (9, 12, 15, 22, 30, 42, 56, 84)
 }
 
+strandbergPen = QPen(Qt.black)
+strandbergPen.setWidth(2)
+
 inlaysGeneralParameters = {
 "black_dot": {
     'type': NoBroderEllipseItem,
@@ -202,8 +205,9 @@ inlaysGeneralParameters = {
 ".strandberg＊": {
     'type': QGraphicsEllipseItem,
     'color': Qt.white,
-    'size_x': 8,
-    'size_y': 8,
+    'pen': strandbergPen,
+    'size_x': 9,
+    'size_y': 9,
     'delta_x': 0.5,
     'delta_y': 0.8},
 "Celeste": {
@@ -222,6 +226,48 @@ inlaysGeneralParameters = {
     'delta_y': 0.76},
 }
 
+sideInlaysRoundSize = 8
+sideInlaysDeltaY = 1.3
+
+sideInlaysGeneralParameters = {
+"black_dot": {
+    'type': NoBroderEllipseItem,
+    'color': Qt.black,
+    'size_x': sideInlaysRoundSize,
+    'size_y': sideInlaysRoundSize,
+    'delta_x': 0.5,
+    'delta_y': sideInlaysDeltaY},
+"white_dot": {
+    'type': NoBroderEllipseItem,
+    'color': Qt.white,
+    'size_x': sideInlaysRoundSize,
+    'size_y': sideInlaysRoundSize,
+    'delta_x': 0.5,
+    'delta_y': sideInlaysDeltaY},
+".strandberg＊": {
+    'type': QGraphicsEllipseItem,
+    'color': Qt.white,
+    'pen': strandbergPen,
+    'size_x': 9,
+    'size_y': 9,
+    'delta_x': 0.5,
+    'delta_y': sideInlaysDeltaY},
+"Celeste": {
+    'type': NoBroderRectItem,
+    'color': QColor(234, 202, 164),
+    'size_x': 7,
+    'size_y': 12,
+    'delta_x': 0.5,
+    'delta_y': sideInlaysDeltaY-.1},
+"Millimetric": {
+    'type': NoBroderRectItem,
+    'color': Qt.black,
+    'size_x': 2,
+    'size_y': 12,
+    'delta_x': 0.5,
+    'delta_y': sideInlaysDeltaY-.1},
+}
+
 inlaymarkings = {
 2: 1,
 4: 1,
@@ -238,14 +284,19 @@ inlaymarkings = {
 # based on the generic inlay of each type, we generate all the inlays for every
 # position on the neck
 inlays = {}
+sideInlays = {}
 for inlayType in inlaysGeneralParameters.keys():
     inlays[inlayType] = {}
+    sideInlays[inlayType] = {}
     for inlaymarking in inlaymarkings.keys():
         inlays[inlayType][inlaymarking] = []
+        sideInlays[inlayType][inlaymarking] = []
         for i in range(inlaymarkings[inlaymarking]):
             inlays[inlayType][inlaymarking].append({})
+            sideInlays[inlayType][inlaymarking].append({})
             for param in inlaysGeneralParameters[inlayType].keys():
                 inlays[inlayType][inlaymarking][i][param] = inlaysGeneralParameters[inlayType][param]
+                sideInlays[inlayType][inlaymarking][i][param] = sideInlaysGeneralParameters[inlayType][param]
 
 # and according to each type, we tune the positions and or size of certain inlays
 inlays["black_dot"][11][0]['delta_y'] = 0.75
@@ -278,6 +329,30 @@ inlays["Millimetric"][23][0]['delta_x'] -= 0.17
 inlays["Millimetric"][23][1]['delta_x'] += 0.17
 
 inlays["None"]= {}
+
+# and according to each type, we tune the positions and or size of certain sideInlays
+sideInlays["black_dot"][11][0]['delta_x'] -= 0.17
+sideInlays["black_dot"][11][1]['delta_x'] += 0.17
+sideInlays["black_dot"][23][0]['delta_x'] -= 0.17
+sideInlays["black_dot"][23][1]['delta_x'] += 0.17
+
+sideInlays["white_dot"][11][0]['delta_x'] -= 0.17
+sideInlays["white_dot"][11][1]['delta_x'] += 0.17
+sideInlays["white_dot"][23][0]['delta_x'] -= 0.17
+sideInlays["white_dot"][23][1]['delta_x'] += 0.17
+
+sideInlays[".strandberg＊"][11][0]['delta_x'] -= 0.17
+sideInlays[".strandberg＊"][11][1]['delta_x'] += 0.17
+sideInlays[".strandberg＊"][23][0]['delta_x'] -= 0.17
+sideInlays[".strandberg＊"][23][1]['delta_x'] += 0.17
+
+sideInlays["Millimetric"][11][0]['delta_x'] -= 0.17
+sideInlays["Millimetric"][11][1]['delta_x'] += 0.17
+sideInlays["Millimetric"][23][0]['delta_x'] -= 0.17
+sideInlays["Millimetric"][23][1]['delta_x'] += 0.17
+
+sideInlays["None"]= {}
+
 
 
 degrees = ("I", "II", "III", "IV", "V", "VI", "VII")

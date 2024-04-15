@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QDialog, QPushButton, QRadioButton, QComboBox, QMe
 from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
 from PySide6.QtGui import QPolygonF, QPen, QPainter, QAction, QFont, QColor
 import math
-from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements, inlays
+from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements, inlays, sideInlays
 
 # -----------------------------------------------------------------------------
 SCALE_CIRCLE_RADIUS = 160
@@ -25,6 +25,28 @@ GRAPHICSVIEW_WIDTH = 459
 GRAPHICSVIEW_HEIGHT = 366
 
 # -----------------------------------------------------------------------------
+
+class NoBroderEllipseItem(QGraphicsEllipseItem):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # Set the pen to transparent color (no border)
+        self.setPen(QPen(Qt.transparent))
+
+class NoteItem(QGraphicsEllipseItem):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptHoverEvents(True)
+
+    def hoverEnterEvent(self, event):
+        # Function to execute when mouse enters the ellipse
+        print("Mouse entered the ellipse")
+        # Add your desired functionality here
+
+    def hoverLeaveEvent(self, event):
+        # Function to execute when mouse leaves the ellipse
+        print("Mouse left the ellipse")
+        # Add your desired functionality here
 
 class NeckWindow(QDialog):
     def __init__(self, mainWindowInstance):
@@ -95,17 +117,14 @@ class NeckWindow(QDialog):
         self.currentTuning = tunings[self.currentTuningName]
         self.num_strings = len(self.currentTuning)
 
-
-        # All this will be useful to draw a more realistic neck
         tuningNotesComposition = tuning_name.split('\t')[1].split()
-        print(tuningNotesComposition)
+        #print(tuningNotesComposition)
         firstTuningNote = ''
         if len(tuningNotesComposition)>0 and tuningNotesComposition[0][1] == '♯':
             firstTuningNote = tuningNotesComposition[0][0]+tuningNotesComposition[0][1]
         else:
             firstTuningNote = tuningNotesComposition[0][0]
-        print("\nIn set_tuning of NeckWindow, firstTuningNote: %s" % firstTuningNote)
-
+        #print("\nIn set_tuning of NeckWindow, firstTuningNote: %s" % firstTuningNote)
         if not init:
             self.setRootNote()
             #self.draw_notes_on_neck()
@@ -131,24 +150,21 @@ class NeckWindow(QDialog):
 
     def set_arrangement(self, arrangement):
         self.currentArrangement = arrangement
-        #print("\nIn set_arrangement of NeckGeneralView, setting arrangement as ")
-        #print(arrangement)
         self.label_degrees_on_neck()
 
     def setRootNote(self):
         # All this will be useful to draw a more realistic neck
         tuningNotesComposition = self.currentTuningName.split('\t')[1].split()
-        print(tuningNotesComposition)
+        #print(tuningNotesComposition)
         firstTuningNote = ''
         if len(tuningNotesComposition)>0 and tuningNotesComposition[0][1] == '♯':
             firstTuningNote = tuningNotesComposition[0][0]+tuningNotesComposition[0][1]
         else:
             firstTuningNote = tuningNotesComposition[0][0]
-
         firstTuningNoteValue = notes[firstTuningNote]
         rootNoteValue = notes[self.root_note_combobox.currentText()]
-        print('\nIn setRootNote: firstTuningNoteValue: %s' % firstTuningNoteValue)
-        print('\nIn setRootNote: rootNoteValue: %s' % rootNoteValue)
+        #print('\nIn setRootNote: firstTuningNoteValue: %s' % firstTuningNoteValue)
+        #print('\nIn setRootNote: rootNoteValue: %s' % rootNoteValue)
         self.first_root_position = (rootNoteValue - firstTuningNoteValue)-1
         self.draw_notes_on_neck()
         self.label_degrees_on_neck()
@@ -167,7 +183,6 @@ class NeckWindow(QDialog):
         self.rootNote = "E"
         self.root_note_combobox.setCurrentText(self.rootNote)
         self.root_note_combobox.currentTextChanged.connect(lambda: self.setRootNote())
-        #self.root_note_combobox.highlighted.connect(self.setRootNote)
         self.topHBoxLayout.addWidget(self.root_note_combobox)
 
     def create_inlays_combobox(self):
@@ -175,7 +190,6 @@ class NeckWindow(QDialog):
         self.inlays_combobox.addItems(inlays.keys())
         self.inlays_combobox.setCurrentText(".strandberg＊")
         self.inlays_combobox.currentTextChanged.connect(lambda: self.draw_notes_on_neck())
-        #self.root_note_combobox.highlighted.connect(self.setRootNote)
         self.topHBoxLayout.addWidget(self.inlays_combobox)
 
     def move_root_index(self, direction):
@@ -183,20 +197,6 @@ class NeckWindow(QDialog):
         Unused currently. Moves the root notes
         '''
         self.rootIndexInScale = (self.rootIndexInScale+direction)%self.scaleLength
-
-    def define_root_by_note_click(self, event):
-        '''
-        Not functional; unused
-        '''
-        print("click ok", event.scenePos())
-        if event.button() == Qt.LeftButton:
-            print("left click ok")
-            # Check if the mouse click is inside the ellipse
-            for semitone_text in self.identifiedNotes.keys():
-                for note in self.identifiedNotes[semitone_text]:
-                    print("that is generating a lot of trace...")
-                    if note[0].contains(event.scenePos()):
-                        print("Clicked on %s situated in x: %s - y: %s!"%(note[1], note[2], note[3]))
 
     def draw_neck_background(self, rootUndefined=True):
         '''
@@ -255,22 +255,35 @@ class NeckWindow(QDialog):
             line.setPen(fret_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
-
         if self.neck_diagram_background_group not in self.neck_scene.items():
             self.neck_scene.addItem(self.neck_diagram_background_group)
 
     def draw_inlays(self, type="black_dot"):
         neck_height = STRING_SPACING * (self.num_strings - 1)
-        localInlays = inlays
         for i in range(0, self.num_frets):
-            if i in localInlays[type].keys():
-                for inlayMark in localInlays[type][i]:
+            # neck Inlays
+            if i in inlays[type].keys():
+                for inlayMark in inlays[type][i]:
                     x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
                     y = neck_height/2 + neck_height/2*inlayMark['delta_y']
                     point = QPointF(x, y)
                     inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
                     inlay.setBrush(inlayMark['color'])
+                    if 'pen' in inlayMark.keys():
+                        inlay.setPen(inlayMark['pen'])
                     self.neck_diagram_background_group.addToGroup(inlay)
+            # Side inlays
+            if i in sideInlays[type].keys():
+                for inlayMark in sideInlays[type][i]:
+                    x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
+                    y = neck_height/2 + neck_height/2*inlayMark['delta_y']
+                    point = QPointF(x, y)
+                    inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
+                    inlay.setBrush(inlayMark['color'])
+                    if 'pen' in inlayMark.keys():
+                        inlay.setPen(inlayMark['pen'])
+                    self.neck_diagram_background_group.addToGroup(inlay)
+
 
     def draw_notes_on_neck(self):
         '''
@@ -307,11 +320,11 @@ class NeckWindow(QDialog):
                         triangle.append(QPointF(0, string_spacing))  # Bottom left point
                         note_point = QGraphicsPolygonItem(triangle)
                         note_point.setPos(x-string_spacing/2.0, y-string_spacing/2.0)
+                        note_point.setPen(QPen(Qt.transparent))
                     else:
-                        note_point = QGraphicsEllipseItem(QRectF(point - QPointF(string_spacing/2.0, string_spacing/2.0), QSizeF(string_spacing, string_spacing)))
+                        note_point = NoBroderEllipseItem(QRectF(point - QPointF(string_spacing/2.0, string_spacing/2.0), QSizeF(string_spacing, string_spacing)))
                     self.identifiedNotes[semitone_text%12].append([note_point, semitone_text, i, j])
                     self.neck_diagram_notes_group.addToGroup(note_point)
-                    #note_point.mousePressEvent = self.define_root_by_note_click
 
         self.color_notes_by_default()
 
@@ -343,7 +356,7 @@ class NeckWindow(QDialog):
         # Label for used Degrees in arrangement
         for j in range(1, self.num_frets):
             x = (fret_spacing/2.0) + j * fret_spacing
-            y = neck_height + 1.5*string_spacing
+            y = neck_height + 1.8*string_spacing
             semitone_text = (self.currentTuning[0] + j) - self.first_root_position
             if (semitone_text%12 in self.shownScale) and (self.first_root_position <= j <= self.num_frets - self.first_root_position):
                 point = QPointF(x, y)
@@ -386,15 +399,9 @@ class NeckWindow(QDialog):
     def color_notes_by_default(self):
         transblack = QColor(Qt.black)
         transblack.setAlpha(128)
-        trans = QColor(Qt.black)
-        trans.setAlpha(255)
-        transblack_pen = QPen(trans)
-        transblack_pen.setColor(trans)
-        gray_pen = QPen(Qt.gray)
         for note in self.identifiedNotes.keys():
             for (note_point, semitone_text, string, fret) in self.identifiedNotes[note]:
                 note_point.setBrush(transblack)
-                note_point.setPen(transblack_pen)
                 '''
                 if self.first_root_position <= fret <= self.num_frets - self.first_root_position:
                     note_point.setBrush(Qt.black)
@@ -466,21 +473,6 @@ class NeckWindow(QDialog):
         event.accept()
 
 
-
-class NoteItem(QGraphicsEllipseItem):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAcceptHoverEvents(True)
-
-    def hoverEnterEvent(self, event):
-        # Function to execute when mouse enters the ellipse
-        print("Mouse entered the ellipse")
-        # Add your desired functionality here
-
-    def hoverLeaveEvent(self, event):
-        # Function to execute when mouse leaves the ellipse
-        print("Mouse left the ellipse")
-        # Add your desired functionality here
 
 class CircleAndNeckVBoxFrame(QFrame):
     def __init__(self, topApp, degree, visible=False, name="frame0"):
@@ -627,17 +619,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         stringsPushButtonsVBoxLayout.addWidget(down_button)
         self.centralHBoxLayout.addLayout(stringsPushButtonsVBoxLayout)
 
-    """
-    def create_modes_arrow_buttons(self):
-        left_button = QPushButton("⤵", self)
-        left_button.setGeometry(20, 60, 30, 30)
-        left_button.clicked.connect(self.rotate_notes_clockwise)
-
-        right_button = QPushButton("⤹", self)
-        right_button.setGeometry(self.width() - 2*45, 60, 30, 30)
-        right_button.clicked.connect(self.rotate_notes_counterclockwise)
-    """
-
     def set_scale(self, scale_name):
         #print("\nIn set_scale of %s to set scale %s" % (self.name, scale_name))
         # Keeping current degree, rotation and ref degree
@@ -674,11 +655,11 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def set_degree(self, degreeIndex, movingRef=False):
         #print("\nIn set_degree of %s to set degree to %s for %s moving reference" % (self.name, degreeIndex, movingRef))
-        print("\nIn set_degree of frame %s to set degreeIndex %s when movingRef %s" % (self.name, degreeIndex, movingRef))
+        #print("\nIn set_degree of frame %s to set degreeIndex %s when movingRef %s" % (self.name, degreeIndex, movingRef))
         if not movingRef:
-            print("\nIn set_degree of frame %s to set degreeIndex %s with self.referenceDegree %s" % (self.name, degreeIndex, self.referenceDegree))
+            #print("\nIn set_degree of frame %s to set degreeIndex %s with self.referenceDegree %s" % (self.name, degreeIndex, self.referenceDegree))
             degreeIndex = (degreeIndex + (self.referenceDegree - 1))%self.scaleLength
-            print("\nIn set_degree of frame %s to set degreeIndex %s" % (self.name, degreeIndex))
+            #print("\nIn set_degree of frame %s to set degreeIndex %s" % (self.name, degreeIndex))
 
         currentDegreeIndex = self.currentDegree-1
         #print("In set_degree of %s, currentDegreeIndex: %s --- degreeIndex:%s" % (self.name, currentDegreeIndex, degreeIndex))
@@ -695,10 +676,10 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.draw_scale()
             self.draw_notes_on_neck()
         self.currentDegree = degreeIndex+1
-        print("In set_degree of %s, current after: %s" % (self.name, self.currentDegree))
+        #print("In set_degree of %s, current after: %s" % (self.name, self.currentDegree))
 
     def set_reference_degree(self, degreeName, degreeIndex):
-        print("\nIn set_reference_degree of %s to set reference to %s with index %s" % (self.name, degreeName, degreeIndex))
+        #print("\nIn set_reference_degree of %s to set reference to %s with index %s" % (self.name, degreeName, degreeIndex))
         #print("In set_reference_degree of %s, reference and current before: %s --- %s" % (self.name, self.referenceDegree, self.currentDegree))
         deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.referenceDegree-1)
         CurrentDegreeToSet = (degreeIndex+deltaCurrentDegreeToReference)%self.scaleLength
@@ -706,8 +687,8 @@ class CircleAndNeckVBoxFrame(QFrame):
         #print("In set_reference_degree of %s, current degree to set: %s" % (self.name, CurrentDegreeToSet))
         self.referenceDegree = degreeIndex+1
         self.set_degree(CurrentDegreeToSet, movingRef=True)
-        print("In set_reference_degree of %s, reference after: %s" % (self.name, self.referenceDegree))
-        print("In set_reference_degree of %s, current after: %s" % (self.name, self.currentDegree))
+        #print("In set_reference_degree of %s, reference after: %s" % (self.name, self.referenceDegree))
+        #print("In set_reference_degree of %s, current after: %s" % (self.name, self.currentDegree))
 
     def draw_scale_circle(self):
         center = QPointF(0, 0)
@@ -1203,7 +1184,7 @@ class MainWindow(QMainWindow):
 # -----------------------------------------------------------------------------
 
     def set_arrangement(self, arrangement, arrIndex):
-        print("\nIn set_arrangement to set %s with arrIndex %s" % (arrangement, arrIndex))
+        #print("\nIn set_arrangement to set %s with arrIndex %s" % (arrangement, arrIndex))
         self.arrangementString = arrangement
         self.arrangement = degreeArrangements[arrIndex]
         self.clearDegreeFrames()
@@ -1211,19 +1192,22 @@ class MainWindow(QMainWindow):
         for i in range(len(self.arrangement)):
             name = "frame_%s"%(1+i)
             self.addDegreeFrame(name=name)
+        # One needs to re-apply all the settings for the frames were recreated
+        self.set_scale(self.scales_combobox.currentText())
+        self.set_tuning(self.tunings_combobox.currentText())
         self.set_reference_degree(self.reference_degree_combobox.currentText(), self.reference_degree_combobox.currentIndex())
         for i in range(len(self.arrangement)):
-            print("In set_arrangement to set degree: %s called %s" % (self.arrangement[i], degrees[self.arrangement[i]-1]))
-            print("In set_arrangement with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
+            #print("In set_arrangement to set degree: %s called %s" % (self.arrangement[i], degrees[self.arrangement[i]-1]))
+            #print("In set_arrangement with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
             self.degreesFrames[i].show()
-            print('In set_arrangement, frame %s with reference degree %s' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
+            #print('In set_arrangement, frame %s with reference degree %s' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
             self.degreesFrames[i].set_degree(self.arrangement[i]-1)
         if not self.neckGeneralView == "":
             self.neckGeneralView.set_arrangement(self.arrangement)
 
     def set_reference_degree(self, degreeName, degreeIndex):
         self.referenceDegreeIndex = degreeIndex
-        print("In set_reference_degree with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
+        #print("In set_reference_degree with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
         for vFrame in self.degreesFrames:
             vFrame.set_reference_degree(degreeName, degreeIndex)
         if not self.neckGeneralView == "":
