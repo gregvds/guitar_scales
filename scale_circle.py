@@ -13,7 +13,8 @@ from PySide6.QtWidgets import QDialog, QPushButton, QRadioButton, QComboBox, QMe
 from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
 from PySide6.QtGui import QPolygonF, QPen, QPainter, QAction, QFont, QColor
 import math
-from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements, inlays, sideInlays
+from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, enrichments, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements
+from Inlays import NoBroderEllipseItem, inlays, sideInlays
 
 # -----------------------------------------------------------------------------
 SCALE_CIRCLE_RADIUS = 160
@@ -25,13 +26,6 @@ GRAPHICSVIEW_WIDTH = 459
 GRAPHICSVIEW_HEIGHT = 366
 
 # -----------------------------------------------------------------------------
-
-class NoBroderEllipseItem(QGraphicsEllipseItem):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        # Set the pen to transparent color (no border)
-        self.setPen(QPen(Qt.transparent))
 
 class NoteItem(QGraphicsEllipseItem):
     def __init__(self, parent=None):
@@ -47,6 +41,11 @@ class NoteItem(QGraphicsEllipseItem):
         # Function to execute when mouse leaves the ellipse
         print("Mouse left the ellipse")
         # Add your desired functionality here
+
+
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class NeckWindow(QDialog):
     def __init__(self, mainWindowInstance):
@@ -68,6 +67,7 @@ class NeckWindow(QDialog):
         self.num_frets = 24
         self.first_root_position = -1
         self.num_strings = 0
+
 
         # Add neck_graphics_view to layout
         self.mainVBoxLayout = QVBoxLayout()
@@ -117,19 +117,8 @@ class NeckWindow(QDialog):
         self.currentTuningName = tuning_name
         self.currentTuning = tunings[self.currentTuningName]
         self.num_strings = len(self.currentTuning)
-
-        tuningNotesComposition = tuning_name.split('\t')[1].split()
-        #print(tuningNotesComposition)
-        firstTuningNote = ''
-        if len(tuningNotesComposition)>0 and tuningNotesComposition[0][1] == '♯':
-            firstTuningNote = tuningNotesComposition[0][0]+tuningNotesComposition[0][1]
-        else:
-            firstTuningNote = tuningNotesComposition[0][0]
-        #print("\nIn set_tuning of NeckWindow, firstTuningNote: %s" % firstTuningNote)
         if not init:
             self.setRootNote()
-            #self.draw_notes_on_neck()
-            #self.label_degrees_on_neck()
 
     def set_scale(self, scale_name):
         '''
@@ -156,7 +145,6 @@ class NeckWindow(QDialog):
     def setRootNote(self, rootNoteValue=-1):
         # All this will be useful to draw a more realistic neck
         tuningNotesComposition = self.currentTuningName.split('\t')[1].split()
-        #print(tuningNotesComposition)
         firstTuningNote = ''
         if len(tuningNotesComposition)>0 and tuningNotesComposition[0][1] == '♯':
             firstTuningNote = tuningNotesComposition[0][0]+tuningNotesComposition[0][1]
@@ -165,8 +153,6 @@ class NeckWindow(QDialog):
         firstTuningNoteValue = notes[firstTuningNote]
         if rootNoteValue == -1:
             rootNoteValue = notes[self.root_note_combobox.currentText()]
-        #print('\nIn setRootNote: firstTuningNoteValue: %s' % firstTuningNoteValue)
-        #print('\nIn setRootNote: rootNoteValue: %s' % rootNoteValue)
         self.first_root_position = (rootNoteValue - firstTuningNoteValue)-1
         self.draw_notes_on_neck()
         self.label_degrees_on_neck()
@@ -197,10 +183,7 @@ class NeckWindow(QDialog):
         self.topHBoxLayout.addWidget(self.inlays_combobox)
 
     def move_root_index(self, direction):
-        '''
-        Unused currently. Moves the root notes
-        '''
-        self.rootIndexInScale = (self.rootIndexInScale+direction)%self.scaleLength
+        self.rootIndexInScale = (self.rootIndexInScale + direction) % self.scaleLength
 
     def draw_neck_background(self, rootUndefined=True, inlaysType=False):
         '''
@@ -302,11 +285,11 @@ class NeckWindow(QDialog):
         if not inlaysType:
             inlaysType = self.inlays_combobox.currentText()
 
-        fret_spacing = FRET_SPACING
-        string_spacing = STRING_SPACING
+        #fret_spacing = FRET_SPACING
+        #string_spacing = STRING_SPACING
 
-        neck_width = fret_spacing * (self.num_frets + 1)
-        neck_height = string_spacing * (self.num_strings - 1)
+        neck_width  = FRET_SPACING   * (self.num_frets + 1)
+        neck_height = STRING_SPACING * (self.num_strings - 1)
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
 
         self.draw_neck_background(inlaysType=inlaysType)
@@ -316,31 +299,28 @@ class NeckWindow(QDialog):
 
         # from low to high strings
         for i in range(self.num_strings):
-            y = neck_height - (i * string_spacing)
+            y = neck_height - (i * STRING_SPACING)
             # from low to high frets
             for j in range(0, self.num_frets):
-                x = (fret_spacing/2.0) + j * fret_spacing
+                x = (FRET_SPACING / 2.0) + j * FRET_SPACING
                 semitone_text = (self.currentTuning[i] + j) - self.first_root_position
-                if semitone_text%12 in self.shownScale:
+                if semitone_text % 12 in self.shownScale:
                     point = QPointF(x, y)
-                    if self.show_root_radio_button.isChecked() and semitone_text%12 == self.shownScale[self.rootIndexInScale]:
+                    if self.show_root_radio_button.isChecked() and semitone_text % 12 == self.shownScale[self.rootIndexInScale]:
                         triangle = QPolygonF()
-                        triangle.append(QPointF(string_spacing/2.0, 0))  # Top point
-                        triangle.append(QPointF(string_spacing, string_spacing))  # Bottom right point
-                        triangle.append(QPointF(0, string_spacing))  # Bottom left point
+                        triangle.append(QPointF(STRING_SPACING / 2.0, 0))  # Top point
+                        triangle.append(QPointF(STRING_SPACING, STRING_SPACING))  # Bottom right point
+                        triangle.append(QPointF(0, STRING_SPACING))  # Bottom left point
                         note_point = QGraphicsPolygonItem(triangle)
-                        note_point.setPos(x-string_spacing/2.0, y-string_spacing/2.0)
+                        note_point.setPos(x - STRING_SPACING / 2.0, y - STRING_SPACING / 2.0)
                         note_point.setPen(QPen(Qt.transparent))
                     else:
-                        note_point = NoBroderEllipseItem(QRectF(point - QPointF(string_spacing/2.0, string_spacing/2.0), QSizeF(string_spacing, string_spacing)))
-                    self.identifiedNotes[semitone_text%12].append([note_point, semitone_text, i, j])
+                        note_point = NoBroderEllipseItem(QRectF(point - QPointF(STRING_SPACING / 2.0, STRING_SPACING / 2.0), QSizeF(STRING_SPACING, STRING_SPACING)))
+                    self.identifiedNotes[semitone_text % 12].append([note_point, semitone_text, i, j])
                     self.neck_diagram_notes_group.addToGroup(note_point)
-
         self.color_notes_by_default()
-
         if self.neck_diagram_notes_group not in self.neck_scene.items():
             self.neck_scene.addItem(self.neck_diagram_notes_group)
-
         if self.once:
             self.once = False
         else:
@@ -363,7 +343,6 @@ class NeckWindow(QDialog):
             semitone = (self.currentTuning[0] + j) - self.first_root_position
             if (semitone%12 in self.shownScale) and (self.first_root_position <= j <= self.num_frets - self.first_root_position):
                 point = QPointF(x, y)
-
                 # Creation of label object for the note
                 degreeLabel = degrees[(self.shownScale.index(semitone%12) - self.referenceDegree)%self.scaleLength]
                 text_item = QGraphicsSimpleTextItem(degreeLabel)
@@ -400,19 +379,6 @@ class NeckWindow(QDialog):
         for note in self.identifiedNotes.keys():
             for (note_point, semitone_text, string, fret) in self.identifiedNotes[note]:
                 note_point.setBrush(transblack)
-                '''
-                if self.first_root_position <= fret <= self.num_frets - self.first_root_position:
-                    note_point.setBrush(Qt.black)
-                    note_point.setPen(black_pen)
-                else:
-                    note_point.setBrush(Qt.gray)
-                    note_point.setPen(gray_pen)
-
-                    blur_effect = QGraphicsBlurEffect()
-                    blur_radius = (self.first_root_position - fret) if (fret < self.first_root_position) else (fret - (self.num_frets - self.first_root_position))
-                    blur_effect.setBlurRadius(blur_radius*10)
-                    note_point.setGraphicsEffect(blur_effect)
-                '''
 
     def color_degrees(self, firstOnly=True):
         white_pen = QPen(Qt.white)
@@ -435,16 +401,12 @@ class NeckWindow(QDialog):
     def center_neck_view(self):
         # Get the bounding rectangle of all items in the scene
         rect = self.neck_scene.itemsBoundingRect()
-
         # Calculate the center point of the bounding rectangle
         center = rect.center()
-
         # Get the size of the viewport
         view_size = self.neck_graphics_view.viewport().size()
-
         # Calculate the new position for the scene
         scene_pos = center - QPointF(view_size.width() / 2, view_size.height() / 2)
-
         # Set the new position for the scene
         self.neck_scene.setSceneRect(scene_pos.x(), scene_pos.y(), view_size.width(), view_size.height())
         self.neck_graphics_view.viewport().update()
@@ -462,10 +424,12 @@ class NeckWindow(QDialog):
 
     @Slot(int)
     def show_highlighted_inlays(self, index):
-        #print(self.inlays_combobox.itemText(index))
-        #self.draw_neck_background(inlaysType=self.inlays_combobox.itemText(index))
-        #self.draw_inlays(type=self.inlays_combobox.itemText(index))
         self.draw_notes_on_neck(inlaysType=self.inlays_combobox.itemText(index))
+
+
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 class CircleAndNeckVBoxFrame(QFrame):
     def __init__(self, topApp, degree, visible=False, name="frame0"):
@@ -477,6 +441,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         self.once = True
         self.highStringLimit=4
+        self.enrichedChords = {}
         self.maximum_semitone_difference_in_tuning = 0
 
         # In the datamodel, degrees in scale are recorded as 1 to 7
@@ -511,16 +476,13 @@ class CircleAndNeckVBoxFrame(QFrame):
         palette.setColor(self.circle_graphics_view.viewport().backgroundRole(), Qt.lightGray)
         self.circle_graphics_view.viewport().setPalette(palette)
         self.circle_scene = QGraphicsScene()
-        #self.circle_scene.setAcceptHoverEvents(True)
         self.circle_graphics_view.setScene(self.circle_scene)
-        #self.circle_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH, GRAPHICSVIEW_HEIGHT)
         self.thisVBoxLayout.addWidget(self.circle_graphics_view)
 
         # Add a central area for label of mode/degree in scale and chord choice
         self.centralHBoxLayout = QHBoxLayout()
         self.create_mode_labels()
         self.create_chords_combobox()
-        #self.create_modes_arrow_buttons()
         self.create_strings_number_for_chords_buttons()
         self.thisVBoxLayout.addLayout(self.centralHBoxLayout)
 
@@ -533,7 +495,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.neck_graphics_view.viewport().setPalette(palette)
         self.neck_scene = QGraphicsScene()
         self.neck_graphics_view.setScene(self.neck_scene)
-        #self.neck_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH, GRAPHICSVIEW_HEIGHT)
         self.thisVBoxLayout.addWidget(self.neck_graphics_view)
 
         # Groups to hold graphical parts such as general background, note points, line items and center pivot
@@ -555,6 +516,8 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         self.circle_graphics_view.setRenderHint(QPainter.Antialiasing)
         self.neck_graphics_view.setRenderHint(QPainter.Antialiasing)
+
+# -----------------------------------------------------------------------------
 
     def create_mode_labels(self):
         self.centralMiddleVBoxLayout = QVBoxLayout()
@@ -584,26 +547,26 @@ class CircleAndNeckVBoxFrame(QFrame):
         labelFont = QFont()
         labelFont.setPointSize(20)
         labelFont.setFamily("Garamond Premier Pro")
-        chordLabel = QLabel("Chord:")
-        chordLabel.setAlignment(Qt.AlignLeft)
-        chordLabel.setFont(labelFont)
+        self.chordLabel = QLabel("Chords using %s strings:" % self.highStringLimit)
+        self.chordLabel.setAlignment(Qt.AlignLeft)
+        self.chordLabel.setFont(labelFont)
         self.chords_combobox = QComboBox()
-        self.chords_combobox.currentTextChanged.connect(lambda: self.show_chords())
+        self.chords_combobox.currentTextChanged.connect(lambda: self.show_chord())
         self.chords_combobox.highlighted.connect(self.show_highlighted_chord)
 
         chordVBoxLayout = QVBoxLayout()
-        chordVBoxLayout.addWidget(chordLabel)
+        chordVBoxLayout.addWidget(self.chordLabel)
         chordVBoxLayout.addWidget(self.chords_combobox)
         self.centralHBoxLayout.addLayout(chordVBoxLayout)
 
     def create_strings_number_for_chords_buttons(self):
         up_button = QPushButton("↑", self)
-        up_button.clicked.connect(self.more_strings_for_chord)
+        up_button.clicked.connect(lambda: self.strings_for_chord(1))
         up_button.setMinimumWidth(30)
         up_button.setMaximumWidth(40)
 
         down_button = QPushButton("↓", self)
-        down_button.clicked.connect(self.less_strings_for_chord)
+        down_button.clicked.connect(lambda: self.strings_for_chord(-1))
         down_button.setMinimumWidth(30)
         down_button.setMaximumWidth(40)
 
@@ -612,17 +575,13 @@ class CircleAndNeckVBoxFrame(QFrame):
         stringsPushButtonsVBoxLayout.addWidget(down_button)
         self.centralHBoxLayout.addLayout(stringsPushButtonsVBoxLayout)
 
+# -----------------------------------------------------------------------------
+
     def set_scale(self, scale_name):
-        #print("\nIn set_scale of %s to set scale %s" % (self.name, scale_name))
         # Keeping current degree, rotation and ref degree
         degreeIndex = self.currentDegree - 1
         referenceDegreeIndex = self.referenceDegree - 1
         rotation = self.rotation
-        #print("In set_scale of %s, currentDegree: %s" % (self.name, self.currentDegree))
-        #print("In set_scale of %s, referenceDegree: %s" % (self.name, self.referenceDegree))
-        #print("In set_scale of %s, rotation: %s" % (self.name, self.rotation))
-        #print("In set_scale of %s, currentDegreeIndex: %s" % (self.name, degreeIndex))
-        #print("In set_scale of %s, referenceDegreeIndex: %s" % (self.name, referenceDegreeIndex))
         # init before scale change
         self.currentDegree = 1
         self.referenceDegree = 1
@@ -636,52 +595,36 @@ class CircleAndNeckVBoxFrame(QFrame):
         # and set back degree and reference degree
         self.set_degree((degreeIndex-referenceDegreeIndex)%self.scaleLength)
         self.set_reference_degree(degrees[referenceDegreeIndex], referenceDegreeIndex)
-        #print("In set_scale of %s, currentDegree after scale change: %s" % (self.name, self.currentDegree))
-        #print("In set_scale of %s, referenceDegree after scale change: %s" % (self.name, self.referenceDegree))
 
     def set_tuning(self, tuning_name, init=False):
         self.currentTuning = tunings[tuning_name]
         self.currentTuningName = tuning_name
         if not init:
             self.draw_notes_on_neck()
-            self.show_chords()
+            self.show_chord()
 
     def set_degree(self, degreeIndex, movingRef=False):
-        #print("\nIn set_degree of %s to set degree to %s for %s moving reference" % (self.name, degreeIndex, movingRef))
-        #print("\nIn set_degree of frame %s to set degreeIndex %s when movingRef %s" % (self.name, degreeIndex, movingRef))
         if not movingRef:
-            #print("\nIn set_degree of frame %s to set degreeIndex %s with self.referenceDegree %s" % (self.name, degreeIndex, self.referenceDegree))
             degreeIndex = (degreeIndex + (self.referenceDegree - 1))%self.scaleLength
-            #print("\nIn set_degree of frame %s to set degreeIndex %s" % (self.name, degreeIndex))
-
         currentDegreeIndex = self.currentDegree-1
-        #print("In set_degree of %s, currentDegreeIndex: %s --- degreeIndex:%s" % (self.name, currentDegreeIndex, degreeIndex))
         if currentDegreeIndex > degreeIndex:
             for i in range(currentDegreeIndex - degreeIndex):
-                #print('rotating clockwise')
-                self.rotate_notes_clockwise()
+                self.rotate_notes(-1)
         elif currentDegreeIndex < degreeIndex:
             for i in range(degreeIndex-currentDegreeIndex):
-                #print('rotating counterclockwise')
-                self.rotate_notes_counterclockwise()
+                self.rotate_notes(1)
         else:
-            #print('not rotating')
             self.draw_scale()
             self.draw_notes_on_neck()
         self.currentDegree = degreeIndex+1
-        #print("In set_degree of %s, current after: %s" % (self.name, self.currentDegree))
 
     def set_reference_degree(self, degreeName, degreeIndex):
-        #print("\nIn set_reference_degree of %s to set reference to %s with index %s" % (self.name, degreeName, degreeIndex))
-        #print("In set_reference_degree of %s, reference and current before: %s --- %s" % (self.name, self.referenceDegree, self.currentDegree))
         deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.referenceDegree-1)
         CurrentDegreeToSet = (degreeIndex+deltaCurrentDegreeToReference)%self.scaleLength
-        #print("In set_reference_degree of %s, delta between current and ref: %s" % (self.name, deltaCurrentDegreeToReference))
-        #print("In set_reference_degree of %s, current degree to set: %s" % (self.name, CurrentDegreeToSet))
         self.referenceDegree = degreeIndex+1
         self.set_degree(CurrentDegreeToSet, movingRef=True)
-        #print("In set_reference_degree of %s, reference after: %s" % (self.name, self.referenceDegree))
-        #print("In set_reference_degree of %s, current after: %s" % (self.name, self.currentDegree))
+
+# -----------------------------------------------------------------------------
 
     def draw_scale_circle(self):
         center = QPointF(0, 0)
@@ -709,17 +652,14 @@ class CircleAndNeckVBoxFrame(QFrame):
         scale_circle.setBrush(Qt.white)
         scale_circle.setPen(pen2)
         self.scale_circle_center_group.addToGroup(scale_circle)
-        #self.circle_scene.addItem(scale_circle)
         scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(10, 10), QSizeF(20, 20)))
         scale_circle.setBrush(Qt.white)
         scale_circle.setPen(pen)
         self.scale_circle_center_group.addToGroup(scale_circle)
-        #self.circle_scene.addItem(scale_circle)
         scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(5, 5), QSizeF(10, 10)))
         scale_circle.setBrush(Qt.white)
         scale_circle.setPen(pen)
         self.scale_circle_center_group.addToGroup(scale_circle)
-        #self.circle_scene.addItem(scale_circle)
         if self.scale_circle_center_group not in self.circle_scene.items():
             self.circle_scene.addItem(self.scale_circle_center_group)
 
@@ -729,7 +669,6 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.modeName = modes[tuple(scale)]
         else:
             self.modeName = ""
-        #print("\nIn draw_scale of %s: self.currentDegree: %s --- self.referenceDegree: %s" % (self.name, self.currentDegree, self.referenceDegree))
         DegreeLabel = degrees[(self.rotation - (self.referenceDegree-1))%self.scaleLength]
         labelContent = DegreeLabel + " / " + self.modeName
         self.labelModeName.setText(labelContent)
@@ -750,7 +689,6 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         self.clear_group(self.notes_group)
         self.clear_group(self.scale_circle_center_group)
-
 
         for angle, noteSize, note in zip(angles, noteSizes, scale):
             x = center.x() + radius * math.sin(angle)
@@ -891,29 +829,26 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.center_neck_view()
         self.neck_graphics_view.viewport().update()
 
+# -----------------------------------------------------------------------------
+
     def get_maximum_semitone_difference_in_tuning(self):
         self.maximum_semitone_difference_in_tuning = 0
         for i in range(len(self.currentTuning)-2):
             self.maximum_semitone_difference_in_tuning = max(self.maximum_semitone_difference_in_tuning, self.currentTuning[i+1]-self.currentTuning[i])
 
     def get_mode_composition(self):
-
-        # Sets all the required variables according to the number of notes in the mode
-        self.scaleLength = len(self.shownScale)
+        modeComposition = [""] * self.scaleLength
         if self.scaleLength == 7:
             self.referenceScale = scales["Natural"]
             self.noteValues = [1, 2, 3, 4, 5, 6, 7]
-            self.modeComposition = ["", "", "", "", "", "", ""]
             self.evenNoteRejectionMatrix = [0, 4, 1, 5, 2, 6, 3]
         elif self.scaleLength == 6:
             self.referenceScale = [0, 2, 4, 5, 7, 11]
             self.noteValues = [1, 2, 3, 4, 5, 7]
-            self.modeComposition = ["", "", "", "", "", ""]
             self.evenNoteRejectionMatrix = [0, 4, 1, 5, 2, 3]
         elif self.scaleLength == 5:
             self.referenceScale = [0, 2, 4, 7, 9]
             self.noteValues = [1, 2, 3, 5, 6]
-            self.modeComposition = ["", "", "", "", ""]
             self.evenNoteRejectionMatrix = [0, 3, 1, 2, 4]
 
         # And generate the label for the mode composition
@@ -921,33 +856,46 @@ class CircleAndNeckVBoxFrame(QFrame):
             alteration = self.shownScale[note_number] - self.referenceScale[note_number]
             note_value = self.noteValues[note_number]
             if note_value%2 == 0:
-                self.modeComposition[self.evenNoteRejectionMatrix[note_number]] = ("%s"%(alterations[alteration]+str(note_value+7)))
+                modeComposition[self.evenNoteRejectionMatrix[note_number]] = ("%s"%(alterations[alteration]+str(note_value+7)))
             else:
-                self.modeComposition[self.evenNoteRejectionMatrix[note_number]] = ("%s"%(alterations[alteration]+str(note_value)))
-        self.modeCompositionString = ', '.join(self.modeComposition)
-        self.labelModeContent.setText(self.modeCompositionString)
+                modeComposition[self.evenNoteRejectionMatrix[note_number]] = ("%s"%(alterations[alteration]+str(note_value)))
+        modeCompositionString = ', '.join(modeComposition)
+        self.labelModeContent.setText(modeCompositionString)
 
     def get_chords_in_mode(self):
-
         self.availableChords = []
         for chord in chords.keys():
             if set(chord).issubset(tuple(self.shownScale)):
                 self.availableChords.append(chord)
+        self.enrichedChords = {}
+        if self.highStringLimit > 4:
+            self.get_enriched_chords_in_mode()
         self.chords_combobox.clear()
         self.chords_combobox.addItem("", userData=())
         for availableChord in self.availableChords:
             self.chords_combobox.addItem(chords[availableChord]["notation"], userData=availableChord)
+        for enrichedChord in self.enrichedChords.keys():
+            self.chords_combobox.addItem(enrichedChord, userData=self.enrichedChords[enrichedChord])
+
+    def get_enriched_chords_in_mode(self):
+        self.enrichedChords = {}
+        for chord in self.availableChords:
+            if chords[chord]["notation"] in enrichments.keys():
+                for enrichment in enrichments[chords[chord]["notation"]]:
+                    if enrichment["semitones"][0] % 12 in self.shownScale:
+                        enrichedChord =[semitone for semitone in chord]
+                        enrichedChord.append(enrichment["semitones"][0])
+                        self.enrichedChords[enrichment["notation"]] = enrichedChord
+
+
+# -----------------------------------------------------------------------------
 
     def angle_to_hue(self, angle):
         """
         Cosmetic; compute custom hue based on angle of note in circle (30° = a semi-tone)
         """
         # How about rotating colours too :-)
-        #print("\nIn angle_to_hue of %s with rotation: %s" % (self.name, self.rotation))
-        #print("In angle_to_hue of %s with scale %s" % (self.name, scales[self.scaleName]))
-        #print("In angle_to_hue of %s with number of semi_tone: %s" % (self.name, scales[self.scaleName][self.rotation]))
         angleOfRotation = 30*scales[self.scaleName][self.rotation]
-        #print("In angle_to_hue of %s with rotation angle: %s" % (self.name, angleOfRotation))
         # Normalize angle to be between 0 and 360 degrees
         angle = 360*(angle/(2*math.pi))
         angle += angleOfRotation
@@ -984,9 +932,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         if group in self.neck_scene.items():
             self.neck_scene.removeItem(group)
 
-
     def color_notes_by_default(self):
-        #print('color by default with %s strings defined' % self.num_strings)
         black_pen = QPen(Qt.black)
         gray_pen = QPen(Qt.gray)
         # for each note in chord
@@ -1000,26 +946,24 @@ class CircleAndNeckVBoxFrame(QFrame):
                     note_point.setBrush(Qt.gray)
                     note_point.setPen(gray_pen)
                 text_item.setBrush(Qt.white)
-            #for (text_item, semitone_text, string, fret) in self.identifiedNoteTexts[note]:
-            #    text_item.setBrush(Qt.white)
             for (note_point, line_item, note_colour) in self.notesOnCircle[self.shownScale[note%self.scaleLength]]:
                 colour_pen = QPen(Qt.black)
                 colour_pen.setWidth(1)
                 line_item.setPen(colour_pen)
 
     def color_chord_notes(self, chord):
-        #print('color by chord with %s strings defined' % self.num_strings)
         white_pen = QPen(Qt.white)
         gray_pen = QPen(Qt.gray)
         notes_potential_positions = {}
         strings_potential_positions = {}
-
         reserved_string_for_note = {}
         # for each note in chord
         for note in chord:
             notes_potential_positions[note] = []
             # for each position of the note
-            for (note_point, semitone_text, string, fret, text_note) in self.identifiedNotes[note]:
+            #print("\n In color_chord_notes, self.identifiedNotes:")
+            #print(self.identifiedNotes)
+            for (note_point, semitone_text, string, fret, text_note) in self.identifiedNotes[note%12]:
                 # if on an authorized string not already occupied
                 if string <= self.highStringLimit-1 and string not in reserved_string_for_note.keys():
                     if 0 <= semitone_text <= semitonesToConsiderByNumberOfStrings[self.num_strings]:
@@ -1036,7 +980,7 @@ class CircleAndNeckVBoxFrame(QFrame):
                 # we reserve that string for that note
                 reserved_string_for_note[notes_potential_positions[note][0][0]] = note
 
-            for (note_point, line_item, note_colour) in self.notesOnCircle[note]:
+            for (note_point, line_item, note_colour) in self.notesOnCircle[note%12]:
                 colour_pen = QPen(note_colour)
                 colour_pen.setWidth(2)
                 line_item.setPen(colour_pen)
@@ -1057,6 +1001,8 @@ class CircleAndNeckVBoxFrame(QFrame):
                     each_position[2].setPen(white_pen)
                     each_position[3].setBrush(Qt.black)
 
+# -----------------------------------------------------------------------------
+
     def center_neck_view(self):
         # Get the bounding rectangle of all items in the scene
         rect = self.neck_scene.itemsBoundingRect()
@@ -1065,8 +1011,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         # Set the size of the viewport
         self.neck_graphics_view.viewport().setFixedSize(GRAPHICSVIEW_WIDTH, GRAPHICSVIEW_HEIGHT)
         view_size = self.neck_graphics_view.viewport().size()
-        #print("In center_neck_view, viewport().size():")
-        #print(view_size)
         # Calculate the new position for the scene
         scene_pos = center - QPointF(view_size.width() / 2, view_size.height() / 2)
         # Set the new position for the scene
@@ -1075,28 +1019,33 @@ class CircleAndNeckVBoxFrame(QFrame):
     def refresh(self):
         self.center_neck_view()
 
-    @Slot()
-    def rotate_notes_counterclockwise(self):
-        self.rotation +=1
+# -----------------------------------------------------------------------------
+
+    @Slot(int)
+    def rotate_notes(self, rotation):
+        # rotation 1 = rotate counterclockwize
+        # rotation -1 = rotate clockwize
+        self.rotation +=rotation
         self.rotation = self.rotation%self.scaleLength
         self.chordBeforeChange = self.chords_combobox.currentText()
-        # Rotate notes counterclockwise
-        self.shownScale = sorted([(inScale +(12-self.shownScale[1]))%12 for inScale in self.shownScale])
+        self.shownScale = sorted([(inScale +(12-self.shownScale[rotation]))%12 for inScale in self.shownScale])
         self.draw_scale()
         self.draw_notes_on_neck()
         for index in range(self.chords_combobox.count()):
             if self.chordBeforeChange == self.chords_combobox.itemText(index):
                 self.chords_combobox.setCurrentIndex(index)
 
-    @Slot()
-    def rotate_notes_clockwise(self):
-        self.rotation -=1
-        self.rotation = self.rotation%self.scaleLength
+    @Slot(int)
+    def strings_for_chord(self, increment):
+        if increment > 0:
+            self.highStringLimit = min(self.highStringLimit+increment, self.num_strings)
+        else:
+            self.highStringLimit = max(self.highStringLimit+increment, 4)
+        self.chordLabel.setText("Chords using %s strings:" % self.highStringLimit)
         self.chordBeforeChange = self.chords_combobox.currentText()
-        # Rotate notes clockwise
-        self.shownScale = sorted([(inScale +(12-self.shownScale[-1]))%12 for inScale in self.shownScale])
-        self.draw_scale()
-        self.draw_notes_on_neck()
+        self.color_notes_by_default()
+        self.get_chords_in_mode()
+        self.color_chord_notes(self.chords_combobox.currentData())
         for index in range(self.chords_combobox.count()):
             if self.chordBeforeChange == self.chords_combobox.itemText(index):
                 self.chords_combobox.setCurrentIndex(index)
@@ -1104,19 +1053,21 @@ class CircleAndNeckVBoxFrame(QFrame):
     @Slot()
     def more_strings_for_chord(self):
         self.highStringLimit = min(self.highStringLimit+1, self.num_strings)
-        #print('More: %s!'%self.highStringLimit)
+        self.chordLabel.setText("Chords using %s strings:" % self.highStringLimit)
         self.color_notes_by_default()
+        self.get_chords_in_mode()
         self.color_chord_notes(self.chords_combobox.currentData())
 
     @Slot()
     def less_strings_for_chord(self):
         self.highStringLimit = max(self.highStringLimit-1, 4)
-        #print('Less: %s!'%self.highStringLimit)
+        self.chordLabel.setText("Chords using %s strings:" % self.highStringLimit)
         self.color_notes_by_default()
+        self.get_chords_in_mode()
         self.color_chord_notes(self.chords_combobox.currentData())
 
     @Slot()
-    def show_chords(self):
+    def show_chord(self):
         self.color_notes_by_default()
         if self.chords_combobox.currentText() != "":
             self.color_chord_notes(self.chords_combobox.currentData())
@@ -1128,6 +1079,8 @@ class CircleAndNeckVBoxFrame(QFrame):
 
 
 
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1137,8 +1090,6 @@ class MainWindow(QMainWindow):
         self.scaleName = ""
         self.shownScale = list()
         self.scaleLength = 0
-
-        #self.modeName = ""
         self.currentTuningName = ""
 
         # Set a main widget
