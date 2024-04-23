@@ -25,8 +25,21 @@ class NoBroderRectItem(QGraphicsRectItem):
         # Set the pen to transparent color (no border)
         self.setPen(QPen(Qt.transparent))
 
+def hex_to_qcolor(hex_color):
+    # Remove '#' from the beginning of the hexadecimal string if present
+    hex_color = hex_color.lstrip('#')
 
-strandbergPen = QPen(Qt.black)
+    # Convert hexadecimal color code to RGB values
+    red = int(hex_color[0:2], 16)
+    green = int(hex_color[2:4], 16)
+    blue = int(hex_color[4:6], 16)
+
+    # Create a QColor object with the RGB values
+    qcolor = QColor(red, green, blue)
+
+    return qcolor
+
+strandbergPen = QPen(hex_to_qcolor("#1A120B"))
 strandbergPen.setWidth(2)
 
 inlaysGeneralParameters = {
@@ -39,14 +52,14 @@ inlaysGeneralParameters = {
     'delta_y': 0.0},
 "white_dot": {
     'type': NoBroderEllipseItem,
-    'color': Qt.white,
+    'color': hex_to_qcolor("#FAF8F1"),
     'size_x': 25,
     'size_y': 25,
     'delta_x': 0.5,
     'delta_y': 0.0},
 ".strandberg＊": {
     'type': QGraphicsEllipseItem,
-    'color': Qt.white,
+    'color': hex_to_qcolor("#E5E5CB"),
     'pen': strandbergPen,
     'size_x': 9,
     'size_y': 9,
@@ -54,7 +67,7 @@ inlaysGeneralParameters = {
     'delta_y': 0.8},
 "Celeste": {
     'type': NoBroderRectItem,
-    'color': QColor(234, 202, 164),
+    'color': hex_to_qcolor("#E3CAA5"),
     'size_x': 7,
     'size_y': 40,
     'delta_x': 0.5,
@@ -194,3 +207,16 @@ sideInlays["Millimetric"][23][0]['delta_x'] -= 0.17
 sideInlays["Millimetric"][23][1]['delta_x'] += 0.17
 
 sideInlays["None"]= {}
+
+
+customColours = {
+    "moss":   ("#C8B272","#A88B4C","#A0A584","#697153","#43362A","#C8B272"),
+    "lichen": ("#B79A59","#826C37","#54442F","#DBCEAF","#C4AA52","#B79A59"),
+    "sage":   ("#657359","#9AA582","#8B775F","#D7C9BE","#F1E4DB","#657359"),
+    "mojave": ("#153448","#3C5B6F","#948979","#DFD0B8","#153448"),
+    "marsice": ("#ED7D31","#6C5F5B","#4F4A45","#F6F1EE","#ED7D31"),
+    "saltlake": ("#FFF6F4","#FFA41B","#F86F03","#525FE1","#FFF6F4"),
+    "moschen": ("#FEE8B0","#9CA777","#7C9070","#F97B22","#FEE8B0"),
+    "Lichss": ("#F58634","#FFCC29","#81B214","#206A5D","#F58634"),
+    "Destorm": ("#FFB037","#FFE268","#364547","#2F5D62","#FFB037"),
+    "Cotterra": ("#CC7351","#E08F62","#DED7B1","#9DAB86","#CC7351")}
