@@ -11,14 +11,14 @@ from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsRectItem
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPen
 
-class NoBroderEllipseItem(QGraphicsEllipseItem):
+class NoBorderEllipseItem(QGraphicsEllipseItem):
     def __init__(self, parent=None):
         super().__init__(parent)
 
         # Set the pen to transparent color (no border)
         self.setPen(QPen(Qt.transparent))
 
-class NoBroderRectItem(QGraphicsRectItem):
+class NoBorderRectItem(QGraphicsRectItem):
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -44,14 +44,14 @@ strandbergPen.setWidth(2)
 
 inlaysGeneralParameters = {
 "black_dot": {
-    'type': NoBroderEllipseItem,
+    'type': NoBorderEllipseItem,
     'color': Qt.black,
     'size_x': 20,
     'size_y': 20,
     'delta_x': 0.5,
     'delta_y': 0.0},
 "white_dot": {
-    'type': NoBroderEllipseItem,
+    'type': NoBorderEllipseItem,
     'color': hex_to_qcolor("#FAF8F1"),
     'size_x': 25,
     'size_y': 25,
@@ -66,16 +66,16 @@ inlaysGeneralParameters = {
     'delta_x': 0.5,
     'delta_y': 0.8},
 "Celeste": {
-    'type': NoBroderRectItem,
+    'type': NoBorderRectItem,
     'color': hex_to_qcolor("#E3CAA5"),
     'size_x': 7,
     'size_y': 40,
     'delta_x': 0.5,
     'delta_y': 0.8},
 "Millimetric": {
-    'type': NoBroderRectItem,
+    'type': NoBorderRectItem,
     'color': Qt.black,
-    'size_x': 2,
+    'size_x': 2.5,
     'size_y': 45,
     'delta_x': 0.5,
     'delta_y': 0.76},
@@ -86,38 +86,38 @@ sideInlaysDeltaY = 1.3
 
 sideInlaysGeneralParameters = {
 "black_dot": {
-    'type': NoBroderEllipseItem,
+    'type': NoBorderEllipseItem,
     'color': Qt.black,
     'size_x': sideInlaysRoundSize,
     'size_y': sideInlaysRoundSize,
     'delta_x': 0.5,
     'delta_y': sideInlaysDeltaY},
 "white_dot": {
-    'type': NoBroderEllipseItem,
-    'color': Qt.white,
+    'type': NoBorderEllipseItem,
+    'color': hex_to_qcolor("#FAF8F1"),
     'size_x': sideInlaysRoundSize,
     'size_y': sideInlaysRoundSize,
     'delta_x': 0.5,
     'delta_y': sideInlaysDeltaY},
 ".strandberg＊": {
     'type': QGraphicsEllipseItem,
-    'color': Qt.white,
+    'color': hex_to_qcolor("#E5E5CB"),
     'pen': strandbergPen,
     'size_x': 9,
     'size_y': 9,
     'delta_x': 0.5,
     'delta_y': sideInlaysDeltaY},
 "Celeste": {
-    'type': NoBroderRectItem,
-    'color': QColor(234, 202, 164),
+    'type': NoBorderRectItem,
+    'color': hex_to_qcolor("#E3CAA5"),
     'size_x': 7,
     'size_y': 12,
     'delta_x': 0.5,
     'delta_y': sideInlaysDeltaY-.1},
 "Millimetric": {
-    'type': NoBroderRectItem,
+    'type': NoBorderRectItem,
     'color': Qt.black,
-    'size_x': 2,
+    'size_x': 2.5,
     'size_y': 12,
     'delta_x': 0.5,
     'delta_y': sideInlaysDeltaY-.1},
@@ -219,4 +219,7 @@ customColours = {
     "moschen": ("#FEE8B0","#9CA777","#7C9070","#F97B22","#FEE8B0"),
     "Lichss": ("#F58634","#FFCC29","#81B214","#206A5D","#F58634"),
     "Destorm": ("#FFB037","#FFE268","#364547","#2F5D62","#FFB037"),
-    "Cotterra": ("#CC7351","#E08F62","#DED7B1","#9DAB86","#CC7351")}
+    "Desnight": ("#DFD0B8","#948979","#3C5B6F","#153448","#DFD0B8"),
+    "Desele": ("#FFFDCB","#FFB38E","#FF8E8F","#E178C5","#FFFDCB"),
+    "Desset": ("#A3BB98","#F0ECCF","#FBC252","#E178C5","#FFB100"),
+    "Stormset": ("#DCD7C9","#A27B5C","#3F4E4F","#2C3639","#DCD7C9")}

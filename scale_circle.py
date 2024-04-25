@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
 from PySide6.QtGui import QPolygonF, QPen, QBrush, QPainter, QAction, QFont, QColor
 import math
 from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, enrichments, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements
-from Inlays import NoBroderEllipseItem, inlays, sideInlays, customColours
+from Inlays import NoBorderEllipseItem, inlays, sideInlays, customColours
 
 # -----------------------------------------------------------------------------
 SCALE_CIRCLE_RADIUS = 160
@@ -25,7 +25,9 @@ STRING_SPACING = 30
 GRAPHICSVIEW_WIDTH = 459
 GRAPHICSVIEW_HEIGHT = 366
 
-DEGREE_COLOUR = 'moschen'
+NECK_WIDENING = 0 #5
+
+DEGREE_COLOUR = 'Destorm'
 
 # -----------------------------------------------------------------------------
 
@@ -161,6 +163,7 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group = QGraphicsItemGroup()
         self.neck_diagram_inlays_group = QGraphicsItemGroup()
         self.neck_diagram_notes_group = QGraphicsItemGroup()
+        self.neck_diagram_notes_group.setHandlesChildEvents(False)
         self.neck_diagram_colours_group = QGraphicsItemGroup()
         self.neck_diagram_degrees_group = QGraphicsItemGroup()
 
@@ -283,23 +286,19 @@ class NeckWindow(QDialog):
         if not inlaysType:
             inlaysType = self.inlays_combobox.currentText()
 
-        neck_width = FRET_SPACING * (self.num_frets + 1)
+        neck_width  = FRET_SPACING   * (self.num_frets + 1)
         neck_height = STRING_SPACING * (self.num_strings - 1)
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
 
         self.clear_group(self.neck_diagram_background_group)
 
-        # Draw strings
         string_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         string_darkGray_pen.setWidth(1)      # Set the pen width
 
-        #neckWidening = FRET_OVERSHOOT+1
-        neckWidening = 0
-
         #Draw borders of neck
         fretOvershoot = FRET_OVERSHOOT+1
-        top = QGraphicsLineItem(-15, -fretOvershoot, neck_width, -fretOvershoot-neckWidening)
-        bottom = QGraphicsLineItem(-15, neck_height+fretOvershoot, neck_width, neck_height+fretOvershoot+neckWidening)
+        top = QGraphicsLineItem(-15, -fretOvershoot, neck_width, -fretOvershoot-NECK_WIDENING)
+        bottom = QGraphicsLineItem(-15, neck_height+fretOvershoot, neck_width, neck_height+fretOvershoot+NECK_WIDENING)
         string_darkGray_pen.setWidth(0.5)
         top.setPen(string_darkGray_pen)
         bottom.setPen(string_darkGray_pen)
@@ -309,13 +308,11 @@ class NeckWindow(QDialog):
         # Draw inlays
         self.draw_inlays(type=inlaysType) #.strandberg＊
 
+        # Draw strings
         for i in range(self.num_strings):
             y = i * STRING_SPACING
-            if i < 3:
-                widthAdjustment = neckWidening/3*(i-3)
-            else:
-                widthAdjustment = neckWidening/3*(i-2)
-            line = QGraphicsLineItem(-15, y, neck_width, y+widthAdjustment)
+            widthAdjustmentProportion = (y-(neck_height/2))/(neck_height/2)
+            line = QGraphicsLineItem(-15, y, neck_width, y+(widthAdjustmentProportion*NECK_WIDENING))
             string_darkGray_pen.setWidth(strings_thickness[i]/10.0)
             line.setPen(string_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
@@ -326,7 +323,6 @@ class NeckWindow(QDialog):
         line = QGraphicsLineItem(0, -FRET_OVERSHOOT, 0, neck_height+FRET_OVERSHOOT)
         line.setPen(fret_darkGray_pen)
         self.neck_diagram_background_group.addToGroup(line)
-
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(10)      # Set the pen width
         line = QGraphicsLineItem(-15, -FRET_OVERSHOOT+4, -15, neck_height+FRET_OVERSHOOT-4)
@@ -338,7 +334,8 @@ class NeckWindow(QDialog):
         fret_darkGray_pen.setWidth(3)      # Set the pen width
         for i in range(1, self.num_frets + 1):
             x = i * FRET_SPACING
-            line = QGraphicsLineItem(x, -FRET_OVERSHOOT*(1+1*i/self.num_frets), x, neck_height+FRET_OVERSHOOT*(1+1*i/self.num_frets))
+            widthAdjustment = NECK_WIDENING*(i/(self.num_frets + 1))
+            line = QGraphicsLineItem(x, -(FRET_OVERSHOOT + widthAdjustment), x, neck_height+(FRET_OVERSHOOT + widthAdjustment))
             line.setPen(fret_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
@@ -349,11 +346,14 @@ class NeckWindow(QDialog):
         self.clear_group(self.neck_diagram_inlays_group)
         neck_height = STRING_SPACING * (self.num_strings - 1)
         for i in range(0, self.num_frets):
+            adjustmentForFret = NECK_WIDENING*i/self.num_frets
             # neck Inlays
             if i in inlays[type].keys():
                 for inlayMark in inlays[type][i]:
                     x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
-                    y = neck_height/2 + neck_height/2*inlayMark['delta_y']
+                    if inlayMark['delta_y'] < 0:
+                        adjustmentForFret = -adjustmentForFret
+                    y = neck_height/2 + neck_height/2*inlayMark['delta_y'] + adjustmentForFret
                     point = QPointF(x, y)
                     inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
                     inlay.setBrush(inlayMark['color'])
@@ -380,40 +380,51 @@ class NeckWindow(QDialog):
         '''
         if self.once:
             self.neckSceneRect = self.neck_scene.sceneRect()
-        if not inlaysType:
+        if not isinstance(inlaysType, str):
             inlaysType = self.inlays_combobox.currentText()
-
-        #fret_spacing = FRET_SPACING
-        #string_spacing = STRING_SPACING
 
         neck_width  = FRET_SPACING   * (self.num_frets + 1)
         neck_height = STRING_SPACING * (self.num_strings - 1)
-        strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
+        #strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
 
         self.draw_neck_background(inlaysType=inlaysType)
 
         self.identifiedNotes = {each: list() for each in range(12)}
         self.clear_group(self.neck_diagram_notes_group)
 
+        adjustmentForString = 0.0
+        adjustmentForFret = 0.0
+
         # from low to high strings
         for i in range(self.num_strings):
             y = neck_height - (i * STRING_SPACING)
+            adjustmentForString = (y-(neck_height/2))/(neck_height/2)
             # from low to high frets
             for j in range(0, self.num_frets):
-                x = (FRET_SPACING / 2.0) + j * FRET_SPACING
+                x = (j * FRET_SPACING) + (FRET_SPACING / 2.0)
+                adjustmentForFret = x/neck_width
+                adjustmentForFret = (j)/(self.num_frets)
                 semitone_text = (self.currentTuning[i] + j) - self.first_root_position
                 if semitone_text % 12 in self.shownScale:
+                    print("String index %s, string width adjustment: %s, fret index %s, fret width adjustment: %s" % (i, adjustmentForString, j, adjustmentForFret))
+                    adjustment = NECK_WIDENING*(adjustmentForString*adjustmentForFret)/5
+                    print("adjustment: %s" % adjustment)
+                    y = y+adjustment
                     point = QPointF(x, y)
                     if self.show_root_radio_button.isChecked() and semitone_text % 12 == self.shownScale[self.rootIndexInScale]:
                         triangle = QPolygonF()
                         triangle.append(QPointF(STRING_SPACING / 2.0, 0))  # Top point
                         triangle.append(QPointF(STRING_SPACING, STRING_SPACING))  # Bottom right point
                         triangle.append(QPointF(0, STRING_SPACING))  # Bottom left point
-                        note_point = QGraphicsPolygonItem(triangle)
+                        note_point = TriangleNoteItem(triangle, embeddingWidget=self)
                         note_point.setPos(x - STRING_SPACING / 2.0, y - STRING_SPACING / 2.0)
                         note_point.setPen(QPen(Qt.transparent))
                     else:
-                        note_point = NoBroderEllipseItem(QRectF(point - QPointF(STRING_SPACING / 2.0, STRING_SPACING / 2.0), QSizeF(STRING_SPACING, STRING_SPACING)))
+                        note_point = NoteItem(QRectF(point - QPointF(STRING_SPACING / 2.0, STRING_SPACING / 2.0), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
+                    note_point.note = semitone_text%12
+                    note_point.colour = QBrush(Qt.white)
+                    #note_point.colour = self.mainWindowInstance.degreesFrames[0].notesOnCircle[note_point.note][0][2]
+                    note_point.setPen(QPen(Qt.transparent))
                     self.identifiedNotes[semitone_text % 12].append([note_point, semitone_text, i, j])
                     self.neck_diagram_notes_group.addToGroup(note_point)
         self.color_notes_by_default()
@@ -1149,16 +1160,17 @@ class CircleAndNeckVBoxFrame(QFrame):
     def color_notes_by_default(self):
         black_pen = QPen(Qt.black)
         gray_pen = QPen(Qt.gray)
+        trans_pen = QPen(Qt.transparent)
         # for each note in chord
         for note in self.identifiedNotes.keys():
             # for each position of the note
             for (note_point, semitone_text, string, fret, text_item) in self.identifiedNotes[note]:
                 if 0 <= semitone_text <= semitonesToConsiderByNumberOfStrings[self.num_strings]:
                     note_point.setBrush(Qt.black)
-                    note_point.setPen(black_pen)
+                    note_point.setPen(trans_pen)
                 else:
                     note_point.setBrush(Qt.gray)
-                    note_point.setPen(gray_pen)
+                    note_point.setPen(trans_pen)
                 text_item.setBrush(Qt.white)
             for (note_point, line_item, note_colour) in self.notesOnCircle[self.shownScale[note%self.scaleLength]]:
                 colour_pen = QPen(Qt.black)
@@ -1168,6 +1180,7 @@ class CircleAndNeckVBoxFrame(QFrame):
     def color_chord_notes(self, chord):
         white_pen = QPen(Qt.white)
         gray_pen = QPen(Qt.gray)
+        trans_pen = QPen(Qt.transparent)
         notes_potential_positions = {}
         strings_potential_positions = {}
         reserved_string_for_note = {}
@@ -1208,11 +1221,11 @@ class CircleAndNeckVBoxFrame(QFrame):
                         pass
                     else:
                         each_position[2].setBrush(Qt.white)
-                        each_position[2].setPen(white_pen)
+                        each_position[2].setPen(trans_pen)
                         each_position[3].setBrush(Qt.black)
                 else:
                     each_position[2].setBrush(Qt.white)
-                    each_position[2].setPen(white_pen)
+                    each_position[2].setPen(trans_pen)
                     each_position[3].setBrush(Qt.black)
 
     def changeColourDegrees(self, colour):
