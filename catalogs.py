@@ -152,30 +152,38 @@ enrichments = {
 }
 
 tunings = {
-"Standard 6 \tEADGBE"    : (0, 5, 10, 15, 19, 24),
-"Drop D 6 \tDADGBE"      : (0, 7, 12, 17, 21, 26),
-"open 6 \tDGDGBD"        : (0, 5, 12, 17, 21, 24),
-"Standard 7 \tBEADGBE"   : (0, 5, 10, 15, 20, 24, 29),
-"Drop A 7 \tAEADGBE"     : (0, 7, 12, 17, 22, 26, 31),
-"Standard 8 \tF♯BEADGBE" : (0, 5, 10, 15, 20, 25, 29, 34),
-"A-Tuning 8 \tADGCFADG"  : (0, 5, 10, 15, 20, 24, 29, 34),
-"Drop E 8 \tEBEADGBE"    : (0, 7, 12, 17, 22, 27, 31, 36),
-"Drop D 8 \tDADGCFAD"    : (0, 7, 12, 17, 22, 27, 31, 36)
+"Standard bass 4 \tEADG"  : (0, 5, 10, 15),
+"Standard bass 5 \tBEADG" : (0, 5, 10, 15, 20),
+"Standard 6 \tEADGBE"     : (0, 5, 10, 15, 19, 24),
+"Drop D 6 \tDADGBE"       : (0, 7, 12, 17, 21, 26),
+"open 6 \tDGDGBD"         : (0, 5, 12, 17, 21, 24),
+"Standard 7 \tBEADGBE"    : (0, 5, 10, 15, 20, 24, 29),
+"Drop A 7 \tAEADGBE"      : (0, 7, 12, 17, 22, 26, 31),
+"Standard 8 \tF♯BEADGBE"  : (0, 5, 10, 15, 20, 25, 29, 34),
+"A-Tuning 8 \tADGCFADG"   : (0, 5, 10, 15, 20, 24, 29, 34),
+"Drop E 8 \tEBEADGBE"     : (0, 7, 12, 17, 22, 27, 31, 36),
+"Drop D 8 \tDADGCFAD"     : (0, 7, 12, 17, 22, 27, 31, 36)
 }
 
 stringGaugeFromNumberOfString = {
+4 : "standard 4",
+5 : "standard 5",
 6 : "standard 6",
 7 : ".strandberg＊ 7",
 8 : ".standberg＊ 8"
 }
 
 semitonesToConsiderByNumberOfStrings = {
+4: 24,
+5: 24,
 6: 24,
 7: 24,
 8: 36
 }
 
 stringSets = {
+"standard 4"      : (45, 65, 85, 100),
+"standard 5"      : (45, 65, 85, 105, 130),
 "standard 6"      : (10, 13, 17, 26, 36, 46),
 ".strandberg＊ 7" : (9.5, 13, 16, 24, 34, 46, 64),
 ".standberg＊ 8"  : (9, 12, 15, 22, 30, 42, 56, 84)

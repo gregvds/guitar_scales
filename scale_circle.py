@@ -25,8 +25,9 @@ STRING_SPACING = 30
 GRAPHICSVIEW_WIDTH = 459
 GRAPHICSVIEW_HEIGHT = 366
 
-NECK_WIDENING = 0 #5
+NECK_WIDENING = 5 #5
 
+FONT = 'Garamond Premier Pro'
 DEGREE_COLOUR = 'Destorm'
 
 # -----------------------------------------------------------------------------
@@ -130,7 +131,8 @@ class NeckWindow(QDialog):
 
         self.labelFont = QFont()
         self.labelFont.setPointSize(20)
-        self.labelFont.setFamily("Garamond Premier Pro")
+        #self.labelFont.setFamily("Garamond Premier Pro")
+        self.labelFont.setFamily(FONT)
 
         # Add neck_graphics_view to layout
         self.mainVBoxLayout = QVBoxLayout()
@@ -289,6 +291,8 @@ class NeckWindow(QDialog):
         neck_width  = FRET_SPACING   * (self.num_frets + 1)
         neck_height = STRING_SPACING * (self.num_strings - 1)
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
+        highStringThicknessAllowance = strings_thickness[0]/20
+        lowStringThicknessAllowance = strings_thickness[-1]/20
 
         self.clear_group(self.neck_diagram_background_group)
 
@@ -297,8 +301,8 @@ class NeckWindow(QDialog):
 
         #Draw borders of neck
         fretOvershoot = FRET_OVERSHOOT+1
-        top = QGraphicsLineItem(-15, -fretOvershoot, neck_width, -fretOvershoot-NECK_WIDENING)
-        bottom = QGraphicsLineItem(-15, neck_height+fretOvershoot, neck_width, neck_height+fretOvershoot+NECK_WIDENING)
+        top = QGraphicsLineItem(-15, -fretOvershoot-highStringThicknessAllowance, neck_width, -fretOvershoot-NECK_WIDENING-highStringThicknessAllowance)
+        bottom = QGraphicsLineItem(-15, neck_height+fretOvershoot+lowStringThicknessAllowance, neck_width, neck_height+fretOvershoot+NECK_WIDENING+lowStringThicknessAllowance)
         string_darkGray_pen.setWidth(0.5)
         top.setPen(string_darkGray_pen)
         bottom.setPen(string_darkGray_pen)
@@ -320,12 +324,12 @@ class NeckWindow(QDialog):
         # Draw fret 0 and nut
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(4)      # Set the pen width
-        line = QGraphicsLineItem(0, -FRET_OVERSHOOT, 0, neck_height+FRET_OVERSHOOT)
+        line = QGraphicsLineItem(0, -FRET_OVERSHOOT-highStringThicknessAllowance, 0, neck_height+FRET_OVERSHOOT+lowStringThicknessAllowance)
         line.setPen(fret_darkGray_pen)
         self.neck_diagram_background_group.addToGroup(line)
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(10)      # Set the pen width
-        line = QGraphicsLineItem(-15, -FRET_OVERSHOOT+4, -15, neck_height+FRET_OVERSHOOT-4)
+        line = QGraphicsLineItem(-15, -FRET_OVERSHOOT+4-highStringThicknessAllowance, -15, neck_height+FRET_OVERSHOOT-4+lowStringThicknessAllowance)
         line.setPen(fret_darkGray_pen)
         self.neck_diagram_background_group.addToGroup(line)
 
@@ -335,7 +339,7 @@ class NeckWindow(QDialog):
         for i in range(1, self.num_frets + 1):
             x = i * FRET_SPACING
             widthAdjustment = NECK_WIDENING*(i/(self.num_frets + 1))
-            line = QGraphicsLineItem(x, -(FRET_OVERSHOOT + widthAdjustment), x, neck_height+(FRET_OVERSHOOT + widthAdjustment))
+            line = QGraphicsLineItem(x, -(FRET_OVERSHOOT + widthAdjustment + highStringThicknessAllowance), x, neck_height+(FRET_OVERSHOOT + widthAdjustment + lowStringThicknessAllowance))
             line.setPen(fret_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
@@ -345,15 +349,24 @@ class NeckWindow(QDialog):
     def draw_inlays(self, type="black_dot"):
         self.clear_group(self.neck_diagram_inlays_group)
         neck_height = STRING_SPACING * (self.num_strings - 1)
+        halfNeckHeight = neck_height/2
+
+        strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
+        highStringThicknessAllowance = strings_thickness[0]/20
+        lowStringThicknessAllowance = strings_thickness[-1]/20
+
         for i in range(0, self.num_frets):
             adjustmentForFret = NECK_WIDENING*i/self.num_frets
-            # neck Inlays
+
+            # Neck Inlays
             if i in inlays[type].keys():
                 for inlayMark in inlays[type][i]:
                     x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
                     if inlayMark['delta_y'] < 0:
                         adjustmentForFret = -adjustmentForFret
-                    y = neck_height/2 + neck_height/2*inlayMark['delta_y'] + adjustmentForFret
+                    elif inlayMark['delta_y'] == 0:
+                        adjustmentForFret = 0
+                    y = halfNeckHeight + halfNeckHeight*inlayMark['delta_y'] + adjustmentForFret
                     point = QPointF(x, y)
                     inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
                     inlay.setBrush(inlayMark['color'])
@@ -364,7 +377,7 @@ class NeckWindow(QDialog):
             if i in sideInlays[type].keys():
                 for inlayMark in sideInlays[type][i]:
                     x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
-                    y = neck_height/2 + neck_height/2*inlayMark['delta_y']
+                    y = halfNeckHeight + halfNeckHeight*inlayMark['delta_y'] + abs(adjustmentForFret) + lowStringThicknessAllowance
                     point = QPointF(x, y)
                     inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
                     inlay.setBrush(inlayMark['color'])
@@ -385,7 +398,6 @@ class NeckWindow(QDialog):
 
         neck_width  = FRET_SPACING   * (self.num_frets + 1)
         neck_height = STRING_SPACING * (self.num_strings - 1)
-        #strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
 
         self.draw_neck_background(inlaysType=inlaysType)
 
@@ -394,33 +406,33 @@ class NeckWindow(QDialog):
 
         adjustmentForString = 0.0
         adjustmentForFret = 0.0
+        noteRadius = STRING_SPACING / 2.0
+        halfNeckHeight = neck_height/2
 
         # from low to high strings
         for i in range(self.num_strings):
             y = neck_height - (i * STRING_SPACING)
-            adjustmentForString = (y-(neck_height/2))/(neck_height/2)
+            adjustmentForString = (y-halfNeckHeight)/halfNeckHeight #(for a 6 strings: -1, -0.6, -0.2, 0.2, 0.6, 1)
             # from low to high frets
             for j in range(0, self.num_frets):
                 x = (j * FRET_SPACING) + (FRET_SPACING / 2.0)
                 adjustmentForFret = x/neck_width
-                adjustmentForFret = (j)/(self.num_frets)
+                adjustmentForFret = (j+.5)/(self.num_frets) #(should go 0 to 1)
                 semitone_text = (self.currentTuning[i] + j) - self.first_root_position
                 if semitone_text % 12 in self.shownScale:
-                    print("String index %s, string width adjustment: %s, fret index %s, fret width adjustment: %s" % (i, adjustmentForString, j, adjustmentForFret))
-                    adjustment = NECK_WIDENING*(adjustmentForString*adjustmentForFret)/5
-                    print("adjustment: %s" % adjustment)
-                    y = y+adjustment
-                    point = QPointF(x, y)
+                    adjustment = adjustmentForString * adjustmentForFret
+                    pixAdjustment = NECK_WIDENING * adjustment
+                    point = QPointF(x, y + pixAdjustment)
                     if self.show_root_radio_button.isChecked() and semitone_text % 12 == self.shownScale[self.rootIndexInScale]:
                         triangle = QPolygonF()
-                        triangle.append(QPointF(STRING_SPACING / 2.0, 0))  # Top point
+                        triangle.append(QPointF(noteRadius, 0))  # Top point
                         triangle.append(QPointF(STRING_SPACING, STRING_SPACING))  # Bottom right point
                         triangle.append(QPointF(0, STRING_SPACING))  # Bottom left point
                         note_point = TriangleNoteItem(triangle, embeddingWidget=self)
-                        note_point.setPos(x - STRING_SPACING / 2.0, y - STRING_SPACING / 2.0)
+                        note_point.setPos(x - noteRadius, y + pixAdjustment - noteRadius)
                         note_point.setPen(QPen(Qt.transparent))
                     else:
-                        note_point = NoteItem(QRectF(point - QPointF(STRING_SPACING / 2.0, STRING_SPACING / 2.0), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
+                        note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
                     note_point.note = semitone_text%12
                     note_point.colour = QBrush(Qt.white)
                     #note_point.colour = self.mainWindowInstance.degreesFrames[0].notesOnCircle[note_point.note][0][2]
@@ -448,7 +460,7 @@ class NeckWindow(QDialog):
         self.clear_group(self.neck_diagram_colours_group)
 
         font = QFont()
-        font.setFamily("Garamond Premier Pro")
+        font.setFamily(FONT)
         font.setPointSize(.95*(STRING_SPACING))
 
         brush = QBrush(Qt.white, bs=Qt.SolidPattern)
@@ -456,7 +468,7 @@ class NeckWindow(QDialog):
         # Label for used Degrees in arrangement
         for j in range(-1, self.num_frets):
             x = (FRET_SPACING/2.0) + j * FRET_SPACING
-            y = neck_height + 1.8 * STRING_SPACING
+            y = neck_height + 2.1 * STRING_SPACING
             point = QPointF(x, y)
             semitone = (self.currentTuning[0] + j) - self.first_root_position
 
@@ -655,7 +667,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         # Add Scale label to the layout
         ModeNamefont = QFont()
         ModeNamefont.setPointSize(24)
-        ModeNamefont.setFamily("Garamond Premier Pro")
+        ModeNamefont.setFamily(FONT)
         self.labelModeName = QLabel("This is a label")
         self.labelModeName.setAlignment(Qt.AlignCenter)
         self.labelModeName.setFont(ModeNamefont)
@@ -663,7 +675,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         # Add Scale label to the layout
         modeContentfont = QFont()
         modeContentfont.setPointSize(16)
-        modeContentfont.setFamily("Garamond Premier Pro")
+        modeContentfont.setFamily(FONT)
         modeContentfont.setItalic(True)
         self.labelModeContent = QLabel("This is a label")
         self.labelModeContent.setAlignment(Qt.AlignCenter)
@@ -676,7 +688,7 @@ class CircleAndNeckVBoxFrame(QFrame):
     def create_chords_combobox(self):
         labelFont = QFont()
         labelFont.setPointSize(20)
-        labelFont.setFamily("Garamond Premier Pro")
+        labelFont.setFamily(FONT)
         self.chordLabel = QLabel("Chords using %s strings:" % self.highStringLimit)
         self.chordLabel.setAlignment(Qt.AlignLeft)
         self.chordLabel.setFont(labelFont)
@@ -915,7 +927,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.clear_group(self.neck_diagram_notes_group)
 
         font = QFont()
-        font.setFamily("Garamond Premier Pro")
+        font.setFamily(FONT)
         font.setPointSize(.95*(STRING_SPACING - 15))
 
         # from low to high strings
@@ -1011,9 +1023,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def get_root_note(self):
         if self.topApp.neckGeneralView != '':
-            rootNote = self.topApp.neckGeneralView.rootNote
-            print("\n        In get_root_note, rootNote: %s" % rootNote)
-            return rootNote
+            return self.topApp.neckGeneralView.rootNote
         return ''
 
     def get_note_for_current_degree(self, rootNote=''):
@@ -1021,14 +1031,14 @@ class CircleAndNeckVBoxFrame(QFrame):
             rootNote = self.get_root_note()
         if rootNote!='':
             rootNoteIndex = notes[rootNote]
-            print("\n      Rootnote index: %s"%rootNoteIndex)
-            print("      root scale:")
-            print(scales[self.scaleName])
-            print("      self.currentDegreeIndex: %s" % (self.currentDegree-1))
+            #print("\n      Rootnote index: %s"%rootNoteIndex)
+            #print("      root scale:")
+            #print(scales[self.scaleName])
+            #print("      self.currentDegreeIndex: %s" % (self.currentDegree-1))
             noteIndex = (rootNoteIndex + scales[self.scaleName][self.currentDegree-1]) % 12
-            print("      noteIndex: %s"%noteIndex)
+            #print("      noteIndex: %s"%noteIndex)
             note = {value: key for key, value in notes.items()}[noteIndex]
-            print("      note: %s" % note)
+            #print("      note: %s" % note)
             return note
         return ''
 
@@ -1332,7 +1342,7 @@ class MainWindow(QMainWindow):
 
         self.labelFont = QFont()
         self.labelFont.setPointSize(20)
-        self.labelFont.setFamily("Garamond Premier Pro")
+        self.labelFont.setFamily(FONT)
 
         # Set a main widget
         central_widget = QWidget()
@@ -1370,7 +1380,7 @@ class MainWindow(QMainWindow):
 # -----------------------------------------------------------------------------
 
     def set_arrangement(self, arrangement, arrIndex):
-        print("\nIn set_arrangement mainWindow to set %s with arrIndex %s" % (arrangement, arrIndex))
+        #print("\nIn set_arrangement mainWindow to set %s with arrIndex %s" % (arrangement, arrIndex))
         self.arrangementString = arrangement
         self.arrangement = degreeArrangements[arrIndex]
         self.clearDegreeFrames()
@@ -1386,23 +1396,23 @@ class MainWindow(QMainWindow):
             #print("In set_arrangement to set degree: %s called %s" % (self.arrangement[i], degrees[self.arrangement[i]-1]))
             #print("In set_arrangement with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
             self.degreesFrames[i].show()
-            print('In set_arrangement mainWindow for %s with reference degree value: %s before setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
-            print('In set_arrangement mainWindow for %s with current   degree value: %s before setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].currentDegree))
+            #print('In set_arrangement mainWindow for %s with reference degree value: %s before setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
+            #print('In set_arrangement mainWindow for %s with current   degree value: %s before setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].currentDegree))
             self.degreesFrames[i].set_degree(self.arrangement[i]-1)
-            print('In set_arrangement mainWindow for %s with reference degree value: %s after setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
-            print('In set_arrangement mainWindow for %s with current   degree value: %s after setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].currentDegree))
+            #print('In set_arrangement mainWindow for %s with reference degree value: %s after setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
+            #print('In set_arrangement mainWindow for %s with current   degree value: %s after setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].currentDegree))
         if not self.neckGeneralView == "":
             self.neckGeneralView.set_arrangement(self.arrangement)
 
     def set_reference_degree(self, degreeName, degreeIndex):
-        print("\nIn set_reference_degree mainWindow with self.referenceDegreeIndex: %s" % degreeIndex)
-        print('In set_reference_degree mainWindow referenceDegree: %s before change'%(self.referenceDegreeIndex,))
+        #print("\nIn set_reference_degree mainWindow with self.referenceDegreeIndex: %s" % degreeIndex)
+        #print('In set_reference_degree mainWindow referenceDegree: %s before change'%(self.referenceDegreeIndex,))
         self.referenceDegreeIndex = degreeIndex
         for vFrame in self.degreesFrames:
             vFrame.set_reference_degree(degreeName, degreeIndex)
         if not self.neckGeneralView == "":
             self.neckGeneralView.set_reference_degree(degreeIndex)
-        print('In set_reference_degree mainWindow referenceDegree: %s after change'%(self.referenceDegreeIndex,))
+        #print('In set_reference_degree mainWindow referenceDegree: %s after change'%(self.referenceDegreeIndex,))
 
     def set_scale(self, scale_name):
         self.scaleName = scale_name
@@ -1519,6 +1529,7 @@ class MainWindow(QMainWindow):
         label.setFont(self.labelFont)
         self.tunings_combobox = QComboBox()
         self.tunings_combobox.addItems(tunings.keys())
+        self.tunings_combobox.setCurrentText("Standard 6 \tEADGBE")
         self.tunings_combobox.currentTextChanged.connect(lambda: self.set_tuning(self.tunings_combobox.currentText()))
         vBoxLayout = QVBoxLayout()
         vBoxLayout.addWidget(label)
