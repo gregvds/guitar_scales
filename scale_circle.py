@@ -45,7 +45,6 @@ class NoteItem(QGraphicsEllipseItem):
 
     def hoverEnterEvent(self, event):
         # Function to execute when mouse enters the ellipse
-        #print("Mouse entered the ellipse")
         #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
         #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
         self.relatedNotesOnNeck = self.embeddingWidget.identifiedNotes[self.note]
@@ -54,17 +53,24 @@ class NoteItem(QGraphicsEllipseItem):
             #print("Note note: %s"%note[0].note)
             #print("i, j: %s, %s"%(note[2], note[3]))
             self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
-            note[0].setBrush(self.colour)
-        # Add your desired functionality here
+            #print("self.note: %s" % self.note)
+            #print("notesOnCircle:")
+            if hasattr(self.embeddingWidget, 'mainWindowInstance'):
+                #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
+                refDegreeIndex = self.embeddingWidget.mainWindowInstance.referenceDegreeIndex
+                semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
+                note2 = (self.note - semitoneAdjustement)%12
+                color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
+            else:
+                color = self.colour
+            note[0].setBrush(color)
 
     def hoverLeaveEvent(self, event):
         # Function to execute when mouse leaves the ellipse
-        #print("Mouse left the ellipse")
         for (note, originalColour) in zip(self.relatedNotesOnNeck, self.relatedNotesOnNeckOriginalColours):
             note[0].setBrush(originalColour)
         self.relatedNotesOnNeck = []
         self.relatedNotesOnNeckOriginalColours = []
-        # Add your desired functionality here
 
 
 class TriangleNoteItem(QGraphicsPolygonItem):
@@ -79,7 +85,6 @@ class TriangleNoteItem(QGraphicsPolygonItem):
         self.relatedNotesOnNeckOriginalColours = []
 
     def hoverEnterEvent(self, event):
-        # Function to execute when mouse enters the ellipse
         #print("Mouse entered the ellipse")
         #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
         #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
@@ -89,17 +94,24 @@ class TriangleNoteItem(QGraphicsPolygonItem):
             #print("Note note: %s"%note[0].note)
             #print("i, j: %s, %s"%(note[2], note[3]))
             self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
-            note[0].setBrush(self.colour)
-        # Add your desired functionality here
+            #print("self.note: %s" % self.note)
+            #print("notesOnCircle:")
+            if hasattr(self.embeddingWidget, 'mainWindowInstance'):
+                #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
+                refDegreeIndex = self.embeddingWidget.mainWindowInstance.referenceDegreeIndex
+                semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
+                note2 = (self.note - semitoneAdjustement)%12
+                color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
+            else:
+                color = self.colour
+            note[0].setBrush(color)
 
     def hoverLeaveEvent(self, event):
-        # Function to execute when mouse leaves the ellipse
         #print("Mouse left the ellipse")
         for (note, originalColour) in zip(self.relatedNotesOnNeck, self.relatedNotesOnNeckOriginalColours):
             note[0].setBrush(originalColour)
         self.relatedNotesOnNeck = []
         self.relatedNotesOnNeckOriginalColours = []
-        # Add your desired functionality here
 
 
 
@@ -278,9 +290,11 @@ class NeckWindow(QDialog):
         vBoxLayout.addWidget(self.degrees_colours_combobox)
         self.topHBoxLayout.addLayout(vBoxLayout)
 
+# -----------------------------------------------------------------------------
     def move_root_index(self, direction):
         self.rootIndexInScale = (self.rootIndexInScale + direction) % self.scaleLength
 
+# -----------------------------------------------------------------------------
     def draw_neck_background(self, rootUndefined=True, inlaysType=False):
         '''
         Draws the strings and frets background canvas
@@ -434,8 +448,6 @@ class NeckWindow(QDialog):
                     else:
                         note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
                     note_point.note = semitone_text%12
-                    note_point.colour = QBrush(Qt.white)
-                    #note_point.colour = self.mainWindowInstance.degreesFrames[0].notesOnCircle[note_point.note][0][2]
                     note_point.setPen(QPen(Qt.transparent))
                     self.identifiedNotes[semitone_text % 12].append([note_point, semitone_text, i, j])
                     self.neck_diagram_notes_group.addToGroup(note_point)
@@ -580,7 +592,10 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.name = name
 
         self.once = True
+        self.minimumNumberLowerStringsNumber = 4
+        self.maximumNumberHigherStringsNumber = 3
         self.highStringLimit=4
+        self.lowStringLimit=1
         self.enrichedChords = {}
         self.maximum_semitone_difference_in_tuning = 0
 
@@ -1202,7 +1217,7 @@ class CircleAndNeckVBoxFrame(QFrame):
             #print(self.identifiedNotes)
             for (note_point, semitone_text, string, fret, text_note) in self.identifiedNotes[note%12]:
                 # if on an authorized string not already occupied
-                if string <= self.highStringLimit-1 and string not in reserved_string_for_note.keys():
+                if (self.lowStringLimit-1 <= string <= self.highStringLimit-1) and (string not in reserved_string_for_note.keys()):
                     if 0 <= semitone_text <= semitonesToConsiderByNumberOfStrings[self.num_strings]:
                         # if note not Root on the first low string
                         if note > 0 and string == 0:
@@ -1282,11 +1297,19 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     @Slot(int)
     def strings_for_chord(self, increment):
+        #print("High and low: %s - %s" % (self.highStringLimit, self.lowStringLimit))
         if increment > 0:
-            self.highStringLimit = min(self.highStringLimit+increment, self.num_strings)
+            if self.highStringLimit < self.num_strings:
+                self.highStringLimit = min(self.highStringLimit+1, self.num_strings)
+            else:
+                self.lowStringLimit = min(self.lowStringLimit+1, self.maximumNumberHigherStringsNumber)
         else:
-            self.highStringLimit = max(self.highStringLimit+increment, 4)
-        self.chordLabel.setText("Chords using %s strings:" % self.highStringLimit)
+            if self.lowStringLimit > 1:
+                self.lowStringLimit = max(self.lowStringLimit-1, 1)
+            else:
+                self.highStringLimit = max(self.highStringLimit-1, self.minimumNumberLowerStringsNumber)
+        #print("High and low: %s - %s" % (self.highStringLimit, self.lowStringLimit))
+        self.chordLabel.setText("Chords using %s strings:" % (self.highStringLimit-self.lowStringLimit+1))
         self.chordBeforeChange = self.chords_combobox.currentText()
         self.color_notes_by_default()
         self.get_chords_in_mode()
@@ -1294,22 +1317,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         for index in range(self.chords_combobox.count()):
             if self.chordBeforeChange == self.chords_combobox.itemText(index):
                 self.chords_combobox.setCurrentIndex(index)
-
-    @Slot()
-    def more_strings_for_chord(self):
-        self.highStringLimit = min(self.highStringLimit+1, self.num_strings)
-        self.chordLabel.setText("Chords using %s strings:" % self.highStringLimit)
-        self.color_notes_by_default()
-        self.get_chords_in_mode()
-        self.color_chord_notes(self.chords_combobox.currentData())
-
-    @Slot()
-    def less_strings_for_chord(self):
-        self.highStringLimit = max(self.highStringLimit-1, 4)
-        self.chordLabel.setText("Chords using %s strings:" % self.highStringLimit)
-        self.color_notes_by_default()
-        self.get_chords_in_mode()
-        self.color_chord_notes(self.chords_combobox.currentData())
 
     @Slot()
     def show_chord(self):
