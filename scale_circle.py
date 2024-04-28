@@ -57,7 +57,7 @@ class NoteItem(QGraphicsEllipseItem):
             #print("notesOnCircle:")
             if hasattr(self.embeddingWidget, 'mainWindowInstance'):
                 #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
-                refDegreeIndex = self.embeddingWidget.mainWindowInstance.referenceDegreeIndex
+                refDegreeIndex = self.embeddingWidget.mainWindowInstance.degreesFrames[0].currentDegree-1
                 semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
                 note2 = (self.note - semitoneAdjustement)%12
                 color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
@@ -98,7 +98,7 @@ class TriangleNoteItem(QGraphicsPolygonItem):
             #print("notesOnCircle:")
             if hasattr(self.embeddingWidget, 'mainWindowInstance'):
                 #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
-                refDegreeIndex = self.embeddingWidget.mainWindowInstance.referenceDegreeIndex
+                refDegreeIndex = self.embeddingWidget.mainWindowInstance.degreesFrames[0].currentDegree-1
                 semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
                 note2 = (self.note - semitoneAdjustement)%12
                 color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
