@@ -9,7 +9,7 @@
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QGraphicsView, QGraphicsScene
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsItemGroup, QGraphicsPolygonItem, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsSimpleTextItem, QGraphicsLineItem
-from PySide6.QtWidgets import QDialog, QPushButton, QRadioButton, QComboBox, QMenu, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QGraphicsBlurEffect
+from PySide6.QtWidgets import QDialog, QPushButton, QCheckBox, QRadioButton, QComboBox, QSlider, QMenu, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QGraphicsBlurEffect
 from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
 from PySide6.QtGui import QPolygonF, QPen, QBrush, QPainter, QAction, QFont, QColor
 import math
@@ -31,6 +31,48 @@ FONT = 'Garamond Premier Pro'
 DEGREE_COLOUR = 'Destorm'
 
 # -----------------------------------------------------------------------------
+
+class fretZeroNoteItem(QGraphicsPolygonItem):
+    def __init__(self, parenta=None, noteOnNeck=False, embeddingWidget=None):
+        super().__init__(parenta)
+        self.setAcceptHoverEvents(True)
+        self.note = ''
+        self.angle = ''
+        self.colour = ''
+        self.embeddingWidget = embeddingWidget
+        self.relatedNotesOnNeck = []
+        self.relatedNotesOnNeckOriginalColours = []
+
+    def hoverEnterEvent(self, event):
+        #print("Mouse entered the ellipse")
+        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
+        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
+        self.relatedNotesOnNeck = self.embeddingWidget.identifiedNotes[self.note]
+        for note in self.relatedNotesOnNeck:
+            #print("Note on neck diagram attribute:")
+            #print("Note note: %s"%note[0].note)
+            #print("i, j: %s, %s"%(note[2], note[3]))
+            self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
+            #print("self.note: %s" % self.note)
+            #print("notesOnCircle:")
+            if hasattr(self.embeddingWidget, 'mainWindowInstance'):
+                #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
+                refDegreeIndex = self.embeddingWidget.mainWindowInstance.degreesFrames[0].currentDegree-1
+                semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
+                note2 = (self.note - semitoneAdjustement)%12
+                note2 = (self.note)%12
+                color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
+            else:
+                color = self.colour
+            note[0].setBrush(color)
+
+    def hoverLeaveEvent(self, event):
+        #print("Mouse left the ellipse")
+        for (note, originalColour) in zip(self.relatedNotesOnNeck, self.relatedNotesOnNeckOriginalColours):
+            note[0].setBrush(originalColour)
+        self.relatedNotesOnNeck = []
+        self.relatedNotesOnNeckOriginalColours = []
+
 
 class NoteItem(QGraphicsEllipseItem):
     def __init__(self, parenta=None, noteOnNeck=False, embeddingWidget=None):
@@ -140,6 +182,8 @@ class NeckWindow(QDialog):
         self.num_strings = 0
 
         self.colour_degrees = DEGREE_COLOUR
+        self.fanBase = 0
+        self.fanHeight = 1000000
 
         self.labelFont = QFont()
         self.labelFont.setPointSize(20)
@@ -179,6 +223,7 @@ class NeckWindow(QDialog):
         self.neck_diagram_notes_group = QGraphicsItemGroup()
         self.neck_diagram_notes_group.setHandlesChildEvents(False)
         self.neck_diagram_colours_group = QGraphicsItemGroup()
+        self.neck_diagram_colours_group.setHandlesChildEvents(False)
         self.neck_diagram_degrees_group = QGraphicsItemGroup()
 
         # Initialisation
@@ -209,14 +254,14 @@ class NeckWindow(QDialog):
         self.shownScale = scales[self.scaleName]
         self.scaleLength = len(self.shownScale)
         self.rootIndexInScale = 0
-        self.draw_notes_on_neck()
+        self.draw_fanned_neck()
         self.label_degrees_on_neck()
 
     def set_reference_degree(self, degreeIndex):
         deltaDegree = degreeIndex - self.referenceDegree
         self.move_root_index(deltaDegree)
         self.referenceDegree = degreeIndex #(0 - 6)
-        self.draw_notes_on_neck()
+        self.draw_fanned_neck()
         self.label_degrees_on_neck()
 
     def set_arrangement(self, arrangement):
@@ -237,16 +282,37 @@ class NeckWindow(QDialog):
         self.rootNote = self.root_note_combobox.currentText()
         self.first_root_position = (rootNoteValue - firstTuningNoteValue)-1
         self.mainWindowInstance.refresh()
-        self.draw_notes_on_neck()
+        self.draw_fanned_neck()
+        #self.draw_notes_on_neck()
         self.label_degrees_on_neck()
 
 # -----------------------------------------------------------------------------
 
     def create_show_root_button(self):
-        self.show_root_radio_button = QRadioButton("Roots")
-        self.show_root_radio_button.setChecked(True)
-        self.show_root_radio_button.toggled.connect(self.draw_notes_on_neck)
-        self.topHBoxLayout.addWidget(self.show_root_radio_button)
+        '''
+        To be renamed...
+        '''
+        self.show_root_checkbox = QCheckBox("Show roots")
+        self.show_root_checkbox.setChecked(True)
+        self.show_root_checkbox.toggled.connect(self.draw_notes_on_neck)
+        self.fan_frets_checkbox = QCheckBox("Fanned frets")
+        self.fan_frets_checkbox.setChecked(False)
+        self.fan_frets_checkbox.toggled.connect(self.draw_fanned_neck)
+        vBoxLayout = QVBoxLayout()
+        vBoxLayout.addWidget(self.show_root_checkbox)
+        vBoxLayout.addWidget(self.fan_frets_checkbox)
+        self.topHBoxLayout.addLayout(vBoxLayout)
+
+        self.fan_apex_slider = QSlider(Qt.Horizontal)
+        self.fan_apex_slider.setMinimum(0)
+        self.fan_apex_slider.setMaximum(FRET_SPACING   * (self.num_frets + 1))
+        self.fan_apex_slider.setValue(FRET_SPACING * 1)
+        self.fan_apex_slider.setGeometry(-15, -2*STRING_SPACING, FRET_SPACING*(self.num_frets)+15, STRING_SPACING)
+        #self.fan_apex_slider.setStyleSheet("background: transparent;")
+        self.fan_apex_slider.setStyleSheet("background: transparent;\nhandle: { width: 5px; height: 5px; margin: -3px 0;}")
+        self.fan_apex_slider.valueChanged.connect(self.draw_fanned_neck)
+        self.fan_apex_slider.hide()
+        self.neck_scene.addWidget(self.fan_apex_slider)
 
     def create_root_note_combobox(self):
         label = QLabel("Root note:")
@@ -294,7 +360,41 @@ class NeckWindow(QDialog):
     def move_root_index(self, direction):
         self.rootIndexInScale = (self.rootIndexInScale + direction) % self.scaleLength
 
+    def rotate_notes(self, rotation):
+        # rotation 1 = rotate counterclockwize
+        # rotation -1 = rotate clockwize
+        self.shownScale = sorted([(inScale +(12-self.shownScale[rotation]))%12 for inScale in self.shownScale])
+        print(self.shownScale)
+
+
 # -----------------------------------------------------------------------------
+
+    def transFan(self, x, y):
+        '''
+        Displaces the x coordinates according to the current x and y coordinates
+        and the apex of the fanned frets, situated at base length from the nut and
+        height from the center of the neck middle line, positive on the High E string
+        side.
+        Base can be modified with a QSlider
+        '''
+        halfNeckHeight = (STRING_SPACING * (self.num_strings - 1))/2
+        return x - (self.fanBase-x)*(y-halfNeckHeight)/self.fanHeight
+
+    def draw_fanned_neck(self, inlaysType=False):
+        '''
+        General function called when the QSlider value changes.
+        '''
+        if self.fan_frets_checkbox.isChecked():
+            self.fanBase   = self.fan_apex_slider.value()
+            self.fanHeight = (60 - (self.num_strings-6)*20) * (STRING_SPACING * (self.num_strings - 1))
+            self.fan_apex_slider.show()
+        else:
+            self.fanBase   = 0
+            self.fanHeight = 1000000
+            self.fan_apex_slider.hide()
+        self.draw_notes_on_neck(inlaysType=inlaysType)
+        self.update_degrees_colour()
+
     def draw_neck_background(self, rootUndefined=True, inlaysType=False):
         '''
         Draws the strings and frets background canvas
@@ -335,15 +435,28 @@ class NeckWindow(QDialog):
             line.setPen(string_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
+        halfNeckHeight = neck_height/2
+
         # Draw fret 0 and nut
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(4)      # Set the pen width
-        line = QGraphicsLineItem(0, -FRET_OVERSHOOT-highStringThicknessAllowance, 0, neck_height+FRET_OVERSHOOT+lowStringThicknessAllowance)
+        x = 0
+        top  = -FRET_OVERSHOOT-highStringThicknessAllowance
+        bottom = neck_height+FRET_OVERSHOOT+lowStringThicknessAllowance
+        xTop = self.transFan(x, top)
+        xBottom = self.transFan(x, bottom)
+        line = QGraphicsLineItem(xTop, top, xBottom, bottom)
         line.setPen(fret_darkGray_pen)
         self.neck_diagram_background_group.addToGroup(line)
+        # draw nut
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(10)      # Set the pen width
-        line = QGraphicsLineItem(-15, -FRET_OVERSHOOT+4-highStringThicknessAllowance, -15, neck_height+FRET_OVERSHOOT-4+lowStringThicknessAllowance)
+        x = -15
+        top = -FRET_OVERSHOOT+4-highStringThicknessAllowance
+        bottom = neck_height+FRET_OVERSHOOT-4+lowStringThicknessAllowance
+        xTop = self.transFan(x, top)
+        xBottom = self.transFan(x, bottom)
+        line = QGraphicsLineItem(xTop, top, xBottom, bottom)
         line.setPen(fret_darkGray_pen)
         self.neck_diagram_background_group.addToGroup(line)
 
@@ -353,7 +466,11 @@ class NeckWindow(QDialog):
         for i in range(1, self.num_frets + 1):
             x = i * FRET_SPACING
             widthAdjustment = NECK_WIDENING*(i/(self.num_frets + 1))
-            line = QGraphicsLineItem(x, -(FRET_OVERSHOOT + widthAdjustment + highStringThicknessAllowance), x, neck_height+(FRET_OVERSHOOT + widthAdjustment + lowStringThicknessAllowance))
+            top    = -(FRET_OVERSHOOT + widthAdjustment + highStringThicknessAllowance)
+            bottom = neck_height+(FRET_OVERSHOOT + widthAdjustment + lowStringThicknessAllowance)
+            xTop = self.transFan(x, top)
+            xBottom = self.transFan(x, bottom)
+            line = QGraphicsLineItem(xTop, top, xBottom, bottom)
             line.setPen(fret_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
@@ -381,7 +498,8 @@ class NeckWindow(QDialog):
                     elif inlayMark['delta_y'] == 0:
                         adjustmentForFret = 0
                     y = halfNeckHeight + halfNeckHeight*inlayMark['delta_y'] + adjustmentForFret
-                    point = QPointF(x, y)
+                    newX = self.transFan(x, y)
+                    point = QPointF(newX, y)
                     inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
                     inlay.setBrush(inlayMark['color'])
                     if 'pen' in inlayMark.keys():
@@ -392,7 +510,8 @@ class NeckWindow(QDialog):
                 for inlayMark in sideInlays[type][i]:
                     x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
                     y = halfNeckHeight + halfNeckHeight*inlayMark['delta_y'] + abs(adjustmentForFret) + lowStringThicknessAllowance
-                    point = QPointF(x, y)
+                    newX = self.transFan(x, y)
+                    point = QPointF(newX, y)
                     inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
                     inlay.setBrush(inlayMark['color'])
                     if 'pen' in inlayMark.keys():
@@ -423,12 +542,17 @@ class NeckWindow(QDialog):
         noteRadius = STRING_SPACING / 2.0
         halfNeckHeight = neck_height/2
 
+        zeroFretNoteXadjustment = 13
+
+        base   = FRET_SPACING * 1
+        height = neck_height * 20
+
         # from low to high strings
         for i in range(self.num_strings):
             y = neck_height - (i * STRING_SPACING)
             adjustmentForString = (y-halfNeckHeight)/halfNeckHeight #(for a 6 strings: -1, -0.6, -0.2, 0.2, 0.6, 1)
             # from low to high frets
-            for j in range(0, self.num_frets):
+            for j in range(-1, self.num_frets):
                 x = (j * FRET_SPACING) + (FRET_SPACING / 2.0)
                 adjustmentForFret = x/neck_width
                 adjustmentForFret = (j+.5)/(self.num_frets) #(should go 0 to 1)
@@ -436,16 +560,44 @@ class NeckWindow(QDialog):
                 if semitone_text % 12 in self.shownScale:
                     adjustment = adjustmentForString * adjustmentForFret
                     pixAdjustment = NECK_WIDENING * adjustment
-                    point = QPointF(x, y + pixAdjustment)
-                    if self.show_root_radio_button.isChecked() and semitone_text % 12 == self.shownScale[self.rootIndexInScale]:
+
+                    newY = y + pixAdjustment
+
+                    newX = self.transFan(x, newY)
+
+                    point = QPointF(newX, newY)
+                    if j == -1:
+                        # Notes generated by fret 0, shown as rectangles
+                        yTop = newY - STRING_SPACING/2
+                        yBot = newY + STRING_SPACING/2
+                        xLeft = x + zeroFretNoteXadjustment
+                        xRight = x + zeroFretNoteXadjustment + noteRadius/2
+                        xTopLeft = self.transFan(xLeft, yTop)
+                        xTopRight = self.transFan(xRight, yTop)
+                        xBotLeft = self.transFan(xLeft, yBot)
+                        xBotRight = self.transFan(xRight, yBot)
+
+                        rectangle = QPolygonF()
+                        rectangle.append(QPointF(xTopLeft,yTop))
+                        rectangle.append(QPointF(xTopRight,yTop))
+                        rectangle.append(QPointF(xBotRight,yBot))
+                        rectangle.append(QPointF(xBotLeft,yBot))
+
+                        note_point = fretZeroNoteItem(rectangle, embeddingWidget=self)
+                        #note_point.setPos(newX + zeroFretNoteXadjustment + noteRadius/2, newY - noteRadius)
+
+                        #note_point.setPen(QPen(Qt.transparent))
+                    elif self.show_root_checkbox.isChecked() and semitone_text % 12 == self.shownScale[self.rootIndexInScale]:
+                        # Root Notes potentially shown as triangles
                         triangle = QPolygonF()
                         triangle.append(QPointF(noteRadius, 0))  # Top point
                         triangle.append(QPointF(STRING_SPACING, STRING_SPACING))  # Bottom right point
                         triangle.append(QPointF(0, STRING_SPACING))  # Bottom left point
                         note_point = TriangleNoteItem(triangle, embeddingWidget=self)
-                        note_point.setPos(x - noteRadius, y + pixAdjustment - noteRadius)
-                        note_point.setPen(QPen(Qt.transparent))
+                        note_point.setPos(newX - noteRadius, newY - noteRadius)
+                        #note_point.setPen(QPen(Qt.transparent))
                     else:
+                        # playable Notes shown as cercles
                         note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
                     note_point.note = semitone_text%12
                     note_point.setPen(QPen(Qt.transparent))
@@ -481,18 +633,41 @@ class NeckWindow(QDialog):
         for j in range(-1, self.num_frets):
             x = (FRET_SPACING/2.0) + j * FRET_SPACING
             y = neck_height + 2.1 * STRING_SPACING
-            point = QPointF(x, y)
-            semitone = (self.currentTuning[0] + j) - self.first_root_position
 
-            colorect = QGraphicsRectItem(QRectF(point - QPointF(FRET_SPACING/2.0, STRING_SPACING/2.0+2), QSizeF(FRET_SPACING, STRING_SPACING)))
+            yTop = y - STRING_SPACING/2
+            yBot = y + STRING_SPACING/2
+            xLeft = x-FRET_SPACING/2
+            xRight = x+FRET_SPACING/2
+            xTopLeft = self.transFan(xLeft, yTop)
+            xTopRight = self.transFan(xRight, yTop)
+            xBotLeft = self.transFan(xLeft, yBot)
+            xBotRight = self.transFan(xRight, yBot)
+            xLabel = self.transFan(x, y)
+
+            rectangle = QPolygonF()
+            rectangle.append(QPointF(xTopLeft,yTop))
+            rectangle.append(QPointF(xTopRight,yTop))
+            rectangle.append(QPointF(xBotRight,yBot))
+            rectangle.append(QPointF(xBotLeft,yBot))
+            colorect = fretZeroNoteItem(rectangle, embeddingWidget=self)
+            #note_point.setPos(newX + zeroFretNoteXadjustment + noteRadius/2, newY - noteRadius)
+
+            #colorect = QGraphicsRectItem(QRectF(point - QPointF(FRET_SPACING/2.0, STRING_SPACING/2.0+2), QSizeF(FRET_SPACING, STRING_SPACING)))
+
+
             colourAngle = ((self.currentTuning[0] + j - self.first_root_position)*math.pi/6.0)
-            brush.setColor(self.mainWindowInstance.degreesFrames[0].generate_colour_for_angle(colourAngle, includeRotation=False, colours=customColours[self.colour_degrees]))
+            brush.setColor(self.mainWindowInstance.degreesFrames[0].generate_colour_for_angle(colourAngle, includeRotation=True, colours=customColours[self.colour_degrees]))
             colorect.setBrush(brush)
             colorect.setPen(Qt.NoPen)
+
             self.neck_diagram_colours_group.addToGroup(colorect)
 
+            semitone = (self.currentTuning[0] + j) - self.first_root_position
+            colorect.note = semitone%12
             if (semitone%12 in self.shownScale) and (self.first_root_position <= j <= self.num_frets - self.first_root_position):
                 #point = QPointF(x, y)
+                point = QPointF(xLabel, y+3)
+
                 # Creation of label object for the note
                 degreeLabel = degrees[(self.shownScale.index(semitone%12) - self.referenceDegree)%self.scaleLength]
                 text_item = QGraphicsSimpleTextItem(degreeLabel)
@@ -551,9 +726,12 @@ class NeckWindow(QDialog):
                     text_item.hide()
 
     def center_neck_view(self):
+        '''
+        '''
         # Get the bounding rectangle of all items in the scene
         rect = self.neck_scene.itemsBoundingRect()
         # Calculate the center point of the bounding rectangle
+        self.setFixedSize(self.width(), 480 + (self.num_strings-6)*STRING_SPACING)
         center = rect.center()
         # Get the size of the viewport
         view_size = self.neck_graphics_view.viewport().size()
@@ -613,12 +791,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.notesOnCircle = {}
 
         self.colour_degrees = self.topApp.colour_degrees
-
-        if visible:
-            self.show()
-        else:
-            self.hide()
-        self.isVisible = visible
 
         # All the frame is organized in a VBoxLayout
         self.thisVBoxLayout = QVBoxLayout()
