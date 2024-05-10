@@ -156,6 +156,7 @@ tunings = {
 "Standard bass 5 \tBEADG" : (0, 5, 10, 15, 20),
 "Standard 6 \tEADGBE"     : (0, 5, 10, 15, 19, 24),
 "Drop D 6 \tDADGBE"       : (0, 7, 12, 17, 21, 26),
+"Drop E♭ 6 \tE♭B♭E♭A♭CF"  : (0, 7, 12, 17, 21, 26),
 "open 6 \tDGDGBD"         : (0, 5, 12, 17, 21, 24),
 "Standard 7 \tBEADGBE"    : (0, 5, 10, 15, 20, 24, 29),
 "Drop A 7 \tAEADGBE"      : (0, 7, 12, 17, 22, 26, 31),
