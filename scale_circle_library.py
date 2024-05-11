@@ -12,127 +12,74 @@ from catalogs import scales
 
 # -----------------------------------------------------------------------------
 
-class fretZeroNoteItem(QGraphicsPolygonItem):
-    def __init__(self, parenta=None, noteOnNeck=False, embeddingWidget=None):
-        super().__init__(parenta)
-        self.setAcceptHoverEvents(True)
+class GenericNoteItem:
+    def __init__(self, noteOnNeck=False, embeddingWidget=None):
         self.note = ''
         self.angle = ''
         self.colour = ''
         self.embeddingWidget = embeddingWidget
-        self.relatedNotesOnNeck = []
+        #self.relatedNotesOnNeck = []
         self.relatedNotesOnNeckOriginalColours = []
-
-    def hoverEnterEvent(self, event):
-        #print("Mouse entered the ellipse")
-        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
-        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
-        self.relatedNotesOnNeck = self.embeddingWidget.identifiedNotes[self.note]
-        for note in self.relatedNotesOnNeck:
-            #print("Note on neck diagram attribute:")
-            #print("Note note: %s"%note[0].note)
-            #print("i, j: %s, %s"%(note[2], note[3]))
-            self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
-            #print("self.note: %s" % self.note)
-            #print("notesOnCircle:")
-            if hasattr(self.embeddingWidget, 'mainWindowInstance'):
-                #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
-                refDegreeIndex = self.embeddingWidget.mainWindowInstance.degreesFrames[0].currentDegree-1
-                semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
-                note2 = (self.note)%12
-                color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
-            else:
-                color = self.colour
-            note[0].setBrush(color)
-
-    def hoverLeaveEvent(self, event):
-        #print("Mouse left the ellipse")
-        for (note, originalColour) in zip(self.relatedNotesOnNeck, self.relatedNotesOnNeckOriginalColours):
-            note[0].setBrush(originalColour)
-        self.relatedNotesOnNeck = []
-        self.relatedNotesOnNeckOriginalColours = []
-
-
-class NoteItem(QGraphicsEllipseItem):
-    def __init__(self, parenta=None, noteOnNeck=False, embeddingWidget=None):
-        super().__init__(parenta)
-        self.setAcceptHoverEvents(True)
-        self.note = ''
-        self.angle = ''
-        self.colour = ''
-        self.embeddingWidget = embeddingWidget
-        self.relatedNotesOnNeck = []
-        self.relatedNotesOnNeckOriginalColours = []
+        self.continuouslyColoured = False
 
     def hoverEnterEvent(self, event):
         # Function to execute when mouse enters the ellipse
-        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
-        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
-        self.relatedNotesOnNeck = self.embeddingWidget.identifiedNotes[self.note]
-        for note in self.relatedNotesOnNeck:
-            #print("Note on neck diagram attribute:")
-            #print("Note note: %s"%note[0].note)
-            #print("i, j: %s, %s"%(note[2], note[3]))
-            self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
-            #print("self.note: %s" % self.note)
-            #print("notesOnCircle:")
+        #self.relatedNotesOnNeck = self.embeddingWidget.identifiedNotes[self.note]
+        if hasattr(self.embeddingWidget, "mainWindowInstance"):
+            referenceVFrame = self.embeddingWidget.mainWindowInstance.degreesFrames[0]
+            colourCorrection = self.embeddingWidget.scale[referenceVFrame.currentDegree-1]-self.embeddingWidget.scale[self.embeddingWidget.modeIndex]
+        else:
+            colourCorrection = 0
+        for note in self.embeddingWidget.identifiedNotes[self.note]:
+            # If notes should be back to normal when leaving
+            if self.continuouslyColoured is False:
+                note[0].originalColour = note[0].brush().color()
+                #self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
             if hasattr(self.embeddingWidget, 'mainWindowInstance'):
-                #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
-                refDegreeIndex = self.embeddingWidget.mainWindowInstance.degreesFrames[0].currentDegree-1
-                semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
-                note2 = (self.note)%12
-                color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
+                note2 = (self.note - colourCorrection)%12
+                color = referenceVFrame.notesOnCircle[note2][0][2]
             else:
                 color = self.colour
             note[0].setBrush(color)
+            #note[0].continuouslyColoured = bool(self.continuouslyColoured)
+        super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
-        # Function to execute when mouse leaves the ellipse
-        for (note, originalColour) in zip(self.relatedNotesOnNeck, self.relatedNotesOnNeckOriginalColours):
-            note[0].setBrush(originalColour)
-        self.relatedNotesOnNeck = []
-        self.relatedNotesOnNeckOriginalColours = []
+        if self.continuouslyColoured is False:
+            for note in self.embeddingWidget.identifiedNotes[self.note]:
+                note[0].setBrush(note[0].originalColour)
+                #note[0].continuouslyColoured = False
+            #self.relatedNotesOnNeck = []
+            self.relatedNotesOnNeckOriginalColours = []
+        super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        '''
+        Toggles all the coloured notes permanently coloured or not
+        '''
+        for note in self.embeddingWidget.identifiedNotes[self.note]:
+            if note[0].continuouslyColoured:
+                note[0].continuouslyColoured = False
+            else:
+                note[0].continuouslyColoured = True
+        super().mousePressEvent(event)
 
 
-class TriangleNoteItem(QGraphicsPolygonItem):
-    def __init__(self, parenta=None, noteOnNeck=False, embeddingWidget=None):
-        super().__init__(parenta)
+class PolgonNoteItem(GenericNoteItem, QGraphicsPolygonItem):
+    def __init__(self,  parenta=None, noteOnNeck=False, embeddingWidget=None):
+        GenericNoteItem.__init__(self, noteOnNeck=noteOnNeck, embeddingWidget=embeddingWidget)
+        QGraphicsPolygonItem.__init__(self, parenta)
         self.setAcceptHoverEvents(True)
-        self.note = ''
-        self.angle = ''
-        self.colour = ''
-        self.embeddingWidget = embeddingWidget
-        self.relatedNotesOnNeck = []
-        self.relatedNotesOnNeckOriginalColours = []
 
-    def hoverEnterEvent(self, event):
-        #print("Mouse entered the ellipse")
-        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
-        #print("Note attributes:\n    note: %s\n    angle: %s\n    colour: %s" % (self.note, self.angle, self.colour))
-        self.relatedNotesOnNeck = self.embeddingWidget.identifiedNotes[self.note]
-        for note in self.relatedNotesOnNeck:
-            #print("Note on neck diagram attribute:")
-            #print("Note note: %s"%note[0].note)
-            #print("i, j: %s, %s"%(note[2], note[3]))
-            self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
-            #print("self.note: %s" % self.note)
-            #print("notesOnCircle:")
-            if hasattr(self.embeddingWidget, 'mainWindowInstance'):
-                #print(self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle)
-                refDegreeIndex = self.embeddingWidget.mainWindowInstance.degreesFrames[0].currentDegree-1
-                semitoneAdjustement = scales[self.embeddingWidget.mainWindowInstance.scaleName][refDegreeIndex]
-                note2 = (self.note)%12
-                color = self.embeddingWidget.mainWindowInstance.degreesFrames[0].notesOnCircle[note2][0][2]
-            else:
-                color = self.colour
-            note[0].setBrush(color)
+class RounNoteItem(GenericNoteItem, QGraphicsEllipseItem):
+    def __init__(self,  parenta=None, noteOnNeck=False, embeddingWidget=None):
+        GenericNoteItem.__init__(self, noteOnNeck=noteOnNeck, embeddingWidget=embeddingWidget)
+        QGraphicsEllipseItem.__init__(self, parenta)
+        self.setAcceptHoverEvents(True)
 
-    def hoverLeaveEvent(self, event):
-        #print("Mouse left the ellipse")
-        for (note, originalColour) in zip(self.relatedNotesOnNeck, self.relatedNotesOnNeckOriginalColours):
-            note[0].setBrush(originalColour)
-        self.relatedNotesOnNeck = []
-        self.relatedNotesOnNeckOriginalColours = []
+fretZeroNoteItem = PolgonNoteItem
+NoteItem = RounNoteItem
+TriangleNoteItem = PolgonNoteItem
 
 
 # -----------------------------------------------------------------------------
