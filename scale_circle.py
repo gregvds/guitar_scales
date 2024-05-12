@@ -914,6 +914,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         # init before scale change
         self.currentDegree = 1
         self.referenceDegree = 1
+        self.modeIndex = 0
         self.modeRotation = 0
         self.degreeRotation = 0
         # scale change
@@ -921,11 +922,12 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.shownScale = scales[self.scaleName]
         self.modeScale = scales[self.scaleName]
         self.scaleLength = len(self.shownScale)
+        # and set back degree and mode
+        self.set_mode(degrees[referenceDegreeIndex], referenceDegreeIndex)
+        self.set_degree((degreeIndex-referenceDegreeIndex)%self.scaleLength)
+
         self.draw_scale()
         self.draw_notes_on_neck()
-        # and set back degree and reference degree
-        self.set_degree((degreeIndex-referenceDegreeIndex)%self.scaleLength)
-        self.set_mode(degrees[referenceDegreeIndex], referenceDegreeIndex)
 
     def set_tuning(self, tuning_name, init=False):
         self.currentTuning = tunings[tuning_name]
@@ -968,6 +970,9 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         currentModeIndex = self.modeIndex
         self.modeIndex = modeIndex
+
+        print("currentModeIndex: %s" % currentModeIndex)
+
         if currentModeIndex > modeIndex:
             for i in range(currentModeIndex - modeIndex):
                 self.modeScale = self.rotate_notes(-1, self.modeScale)
@@ -1030,8 +1035,11 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.modeName = modes[tuple(scale)]
         else:
             self.modeName = ""
-        rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
-        DegreeLabel = degrees[(rotation - (self.referenceDegree-1))%self.scaleLength]
+        #rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
+        #DegreeLabel = degrees[(rotation - (self.referenceDegree-1))%self.scaleLength]
+        print("self.degreeRotation: %s" % self.degreeRotation)
+        print("self.modeRotation: %s" % self.modeRotation)
+        DegreeLabel = degrees[self.degreeRotation-self.modeRotation]
         labelContent = DegreeLabel + " / " + self.modeName
         self.labelModeName.setText(labelContent)
         self.get_mode_composition()
