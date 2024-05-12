@@ -18,13 +18,13 @@ class GenericNoteItem:
         self.angle = ''
         self.colour = ''
         self.embeddingWidget = embeddingWidget
-        #self.relatedNotesOnNeck = []
         self.relatedNotesOnNeckOriginalColours = []
         self.continuouslyColoured = False
 
     def hoverEnterEvent(self, event):
-        # Function to execute when mouse enters the ellipse
-        #self.relatedNotesOnNeck = self.embeddingWidget.identifiedNotes[self.note]
+        '''
+        Colours momentarly all the same notes on the neck
+        '''
         if hasattr(self.embeddingWidget, "mainWindowInstance"):
             referenceVFrame = self.embeddingWidget.mainWindowInstance.degreesFrames[0]
             colourCorrection = self.embeddingWidget.scale[referenceVFrame.currentDegree-1]-self.embeddingWidget.scale[self.embeddingWidget.modeIndex]
@@ -34,22 +34,26 @@ class GenericNoteItem:
             # If notes should be back to normal when leaving
             if self.continuouslyColoured is False:
                 note[0].originalColour = note[0].brush().color()
-                #self.relatedNotesOnNeckOriginalColours.append(note[0].brush().color())
             if hasattr(self.embeddingWidget, 'mainWindowInstance'):
                 note2 = (self.note - colourCorrection)%12
-                color = referenceVFrame.notesOnCircle[note2][0][2]
+                if note2 in referenceVFrame.notesOnCircle.keys():
+                    color = referenceVFrame.notesOnCircle[note2][0][2]
+                else:
+                    color = self.colour
             else:
                 color = self.colour
             note[0].setBrush(color)
-            #note[0].continuouslyColoured = bool(self.continuouslyColoured)
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
+        '''
+        Stops Colouring momentarly all the same notes on the neck
+        if no continuouslyColoured set by a simple click
+        '''
         if self.continuouslyColoured is False:
             for note in self.embeddingWidget.identifiedNotes[self.note]:
-                note[0].setBrush(note[0].originalColour)
-                #note[0].continuouslyColoured = False
-            #self.relatedNotesOnNeck = []
+                if hasattr(note[0], "originalColour"):
+                    note[0].setBrush(note[0].originalColour)
             self.relatedNotesOnNeckOriginalColours = []
         super().hoverLeaveEvent(event)
 
@@ -63,7 +67,6 @@ class GenericNoteItem:
             else:
                 note[0].continuouslyColoured = True
         super().mousePressEvent(event)
-
 
 class PolgonNoteItem(GenericNoteItem, QGraphicsPolygonItem):
     def __init__(self,  parenta=None, noteOnNeck=False, embeddingWidget=None):
