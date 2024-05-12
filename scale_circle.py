@@ -56,6 +56,7 @@ class NeckWindow(QDialog):
         self.rootNote = ''
 
         self.currentTuningName = ""
+        self.lowStringNoteIndex = 4
         self.currentArrangement = (1,)
 
         self.num_frets = 24
@@ -116,9 +117,13 @@ class NeckWindow(QDialog):
         self.fan_frets_checkbox = QCheckBox("Fanned frets")
         self.fan_frets_checkbox.setChecked(False)
         self.fan_frets_checkbox.toggled.connect(self.draw_fanned_neck)
+        self.tuning_checkbox = QCheckBox("Tuning")
+        self.tuning_checkbox.setChecked(False)
+        self.tuning_checkbox.toggled.connect(self.draw_notes_on_neck)
         vBoxLayout = QVBoxLayout()
         vBoxLayout.addWidget(self.show_root_checkbox)
         vBoxLayout.addWidget(self.fan_frets_checkbox)
+        vBoxLayout.addWidget(self.tuning_checkbox)
         self.topHBoxLayout.addLayout(vBoxLayout)
 
         self.fan_apex_slider = QSlider(Qt.Horizontal)
@@ -183,6 +188,7 @@ class NeckWindow(QDialog):
         self.neck_diagram_colours_group = QGraphicsItemGroup()
         self.neck_diagram_colours_group.setHandlesChildEvents(False)
         self.neck_diagram_degrees_group = QGraphicsItemGroup()
+        self.neck_diagram_tuning_group = QGraphicsItemGroup()
 
 # -----------------------------------------------------------------------------
 
@@ -231,12 +237,20 @@ class NeckWindow(QDialog):
     def setRootNote(self, rootNoteValue=-1):
         # All this will be useful to draw a more realistic neck
         tuningNotesComposition = self.currentTuningName.split('\t')[1].split()
+        notesByIndex = {value: key for key, value in notes.items()}
         firstTuningNote = ''
-        if len(tuningNotesComposition)>0 and tuningNotesComposition[0][1] == '♯':
-            firstTuningNote = tuningNotesComposition[0][0]+tuningNotesComposition[0][1]
-        else:
-            firstTuningNote = tuningNotesComposition[0][0]
+        if len(tuningNotesComposition)>0:
+            if tuningNotesComposition[0][1] == '♯':
+                print("debug 0")
+                firstTuningNote = notesByIndex[notes[tuningNotesComposition[0][0]]+1]
+            elif tuningNotesComposition[0][1] == '♭':
+                print("debug 1")
+                firstTuningNote = notesByIndex[notes[tuningNotesComposition[0][0]]-1]
+            else:
+                print("debug 3")
+                firstTuningNote = tuningNotesComposition[0][0]
         firstTuningNoteValue = notes[firstTuningNote]
+        self.lowStringNoteIndex = firstTuningNoteValue
         if rootNoteValue == -1:
             rootNoteValue = notes[self.root_note_combobox.currentText()]
         self.rootNote = self.root_note_combobox.currentText()
@@ -294,7 +308,7 @@ class NeckWindow(QDialog):
         '''
         self.clear_group(self.neck_diagram_background_group)
         self.clear_group(self.neck_diagram_inlays_group)
-
+        self.clear_group(self.neck_diagram_tuning_group)
 
         # Draw neck borders
         self.draw_neck_borders()
@@ -310,8 +324,13 @@ class NeckWindow(QDialog):
         # Draw strings
         self.draw_strings()
 
+        if self.tuning_checkbox.isChecked():
+            self.draw_tuning()
+
         if self.neck_diagram_inlays_group not in self.neck_scene.items():
             self.neck_scene.addItem(self.neck_diagram_inlays_group)
+        if self.neck_diagram_tuning_group not in self.neck_scene.items():
+            self.neck_scene.addItem(self.neck_diagram_tuning_group)
         if self.neck_diagram_background_group not in self.neck_scene.items():
             self.neck_scene.addItem(self.neck_diagram_background_group)
 
@@ -442,11 +461,7 @@ class NeckWindow(QDialog):
         neck_width  = FRET_SPACING   * (self.num_frets + 1)
         neck_height = STRING_SPACING * (self.num_strings - 1)
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
-        #highStringThicknessAllowance = strings_thickness[0]/20
-        #lowStringThicknessAllowance = strings_thickness[-1]/20
-
         string_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
-        #string_darkGray_pen.setWidth(1)      # Set the pen width
 
         # Draw strings
         for i in range(self.num_strings):
@@ -497,7 +512,6 @@ class NeckWindow(QDialog):
             # from low to high frets
             for j in range(-1, self.num_frets):
                 x = (j * FRET_SPACING) + (FRET_SPACING / 2.0)
-                adjustmentForFret = x/neck_width
                 adjustmentForFret = (j+.5)/(self.num_frets) #(should go 0 to 1)
                 semitone_text = (self.currentTuning[i] + j) - self.first_root_position
                 if semitone_text % 12 in self.modeScale:
@@ -549,6 +563,45 @@ class NeckWindow(QDialog):
             self.once = False
         else:
             self.center_neck_view()
+
+    def draw_tuning(self):
+        neck_height = STRING_SPACING * (self.num_strings - 1)
+        halfNeckHeight = neck_height/2
+        noteRadius = STRING_SPACING / 2.0
+        notesByIndex = {value: key for key, value in notes.items()}
+        tuningXPosition = (-2 * FRET_SPACING) + (FRET_SPACING / 2.0)
+
+        self.clear_group(self.neck_diagram_tuning_group)
+
+        font = QFont()
+        font.setFamily(FONT)
+        font.setPointSize(.95*(STRING_SPACING))
+        brush = QBrush(Qt.white, bs=Qt.SolidPattern)
+
+        for i in range(self.num_strings):
+            y = neck_height - (i * STRING_SPACING)
+            adjustmentForString = (y-halfNeckHeight)/halfNeckHeight #(for a 6 strings: -1, -0.6, -0.2, 0.2, 0.6, 1)
+            # from low to high frets
+            x = tuningXPosition
+            adjustmentForFret = (-.5)/(self.num_frets) #(should go 0 to 1)
+            semitone_text = (self.currentTuning[i] -1) - self.first_root_position
+            note_text = notesByIndex[(self.lowStringNoteIndex + self.currentTuning[i])%12]
+
+            adjustment = adjustmentForString * adjustmentForFret
+            pixAdjustment = NECK_WIDENING * adjustment
+
+            newY = y + pixAdjustment
+            newX = self.transFan(x, newY)
+
+            point = QPointF(newX, newY)
+            #note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
+
+
+            text_item = QGraphicsSimpleTextItem(note_text)
+            text_item.setFont(font)
+            text_item.setPos(point - QPointF(text_item.boundingRect().width()/2.0, text_item.boundingRect().height()/2.0))
+            text_item.setFlags(QGraphicsItem.ItemIgnoresTransformations)
+            self.neck_diagram_tuning_group.addToGroup(text_item)
 
     def label_degrees_on_neck(self):
         neck_height = STRING_SPACING * (self.num_strings - 1)
@@ -906,7 +959,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         for index in range(self.chords_combobox.count()):
             if self.chordBeforeChange == self.chords_combobox.itemText(index):
                 self.chords_combobox.setCurrentIndex(index)
-
 
     def set_mode(self, degreeName, modeIndex):
         deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.referenceDegree-1)
