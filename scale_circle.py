@@ -109,7 +109,6 @@ class NeckWindow(QDialog):
 
     def create_option_buttons(self):
         '''
-        To be renamed...
         '''
         self.show_root_checkbox = QCheckBox("Show roots")
         self.show_root_checkbox.setChecked(True)
@@ -131,7 +130,6 @@ class NeckWindow(QDialog):
         self.fan_apex_slider.setMaximum(FRET_SPACING   * (self.num_frets + 1))
         self.fan_apex_slider.setValue(FRET_SPACING * 1)
         self.fan_apex_slider.setGeometry(-15, -2*STRING_SPACING, FRET_SPACING*(self.num_frets)+15, STRING_SPACING)
-        #self.fan_apex_slider.setStyleSheet("background: transparent;")
         self.fan_apex_slider.setStyleSheet("background: transparent;\nhandle: { width: 5px; height: 5px; margin: -3px 0;}")
         self.fan_apex_slider.valueChanged.connect(self.draw_fanned_neck)
         self.fan_apex_slider.hide()
@@ -551,7 +549,6 @@ class NeckWindow(QDialog):
                     else:
                         # playable Notes shown as cercles
                         note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
-
                     note_point.note = semitone_text%12
                     note_point.setPen(QPen(Qt.transparent))
                     self.identifiedNotes[semitone_text % 12].append([note_point, semitone_text, i, j])
@@ -575,7 +572,7 @@ class NeckWindow(QDialog):
 
         font = QFont()
         font.setFamily(FONT)
-        font.setPointSize(.95*(STRING_SPACING))
+        font.setPointSize(.8*(STRING_SPACING))
         brush = QBrush(Qt.white, bs=Qt.SolidPattern)
 
         for i in range(self.num_strings):
@@ -776,7 +773,8 @@ class CircleAndNeckVBoxFrame(QFrame):
         # the current degree is the used degree of the scale in the arrangement
         self.referenceDegree = 1
         self.currentDegree = degree
-        self.rotation = 0
+        self.modeRotation = 0
+        self.degreeRotation = 0
 
         self.scaleName = ""
         self.shownScale = list()
@@ -912,11 +910,12 @@ class CircleAndNeckVBoxFrame(QFrame):
         # Keeping current degree, rotation and ref degree
         degreeIndex = self.currentDegree - 1
         referenceDegreeIndex = self.referenceDegree - 1
-        rotation = self.rotation
+        #rotation = self.rotation
         # init before scale change
         self.currentDegree = 1
         self.referenceDegree = 1
-        self.rotation = 0
+        self.modeRotation = 0
+        self.degreeRotation = 0
         # scale change
         self.scaleName = scale_name
         self.shownScale = scales[self.scaleName]
@@ -947,9 +946,11 @@ class CircleAndNeckVBoxFrame(QFrame):
         if currentDegreeIndex > degreeIndex:
             for i in range(currentDegreeIndex - degreeIndex):
                 self.shownScale = self.rotate_notes(-1, self.shownScale)
+                self.degreeRotation = (self.degreeRotation-1)%self.scaleLength
         elif currentDegreeIndex < degreeIndex:
             for i in range(degreeIndex-currentDegreeIndex):
                 self.shownScale = self.rotate_notes(1, self.shownScale)
+                self.degreeRotation = (self.degreeRotation+1)%self.scaleLength
         else:
             pass
         self.draw_scale()
@@ -959,9 +960,10 @@ class CircleAndNeckVBoxFrame(QFrame):
         for index in range(self.chords_combobox.count()):
             if self.chordBeforeChange == self.chords_combobox.itemText(index):
                 self.chords_combobox.setCurrentIndex(index)
+        print("In set_degree, self.currentDegreeIndex: %s" % (self.currentDegree-1))
 
     def set_mode(self, degreeName, modeIndex):
-        deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.referenceDegree-1)
+        deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.modeIndex)
         CurrentDegreeToSet = (modeIndex+deltaCurrentDegreeToReference)%self.scaleLength
 
         currentModeIndex = self.modeIndex
@@ -969,13 +971,16 @@ class CircleAndNeckVBoxFrame(QFrame):
         if currentModeIndex > modeIndex:
             for i in range(currentModeIndex - modeIndex):
                 self.modeScale = self.rotate_notes(-1, self.modeScale)
+                self.modeRotation = (self.modeRotation-1)%self.scaleLength
         elif currentModeIndex < modeIndex:
             for i in range(modeIndex-currentModeIndex):
                 self.modeScale = self.rotate_notes(1, self.modeScale)
+                self.modeRotation = (self.modeRotation+1)%self.scaleLength
         else:
             pass
         self.referenceDegree = modeIndex+1
         self.set_degree(CurrentDegreeToSet, movingRef=True)
+        print("In set_mode, self.modeIndex: %s" % self.modeIndex)
 
     def set_reference_degree(self, degreeName, degreeIndex):
         self.set_mode(degreeName, degreeIndex)
@@ -1025,7 +1030,8 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.modeName = modes[tuple(scale)]
         else:
             self.modeName = ""
-        DegreeLabel = degrees[(self.rotation - (self.referenceDegree-1))%self.scaleLength]
+        rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
+        DegreeLabel = degrees[(rotation - (self.referenceDegree-1))%self.scaleLength]
         labelContent = DegreeLabel + " / " + self.modeName
         self.labelModeName.setText(labelContent)
         self.get_mode_composition()
@@ -1301,7 +1307,8 @@ class CircleAndNeckVBoxFrame(QFrame):
         angle = 360*(angle/(2*math.pi))
         # How about rotating colours too :-)
         if includeRotation:
-            angleOfRotation = 30*scales[self.scaleName][self.rotation]
+            #rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
+            angleOfRotation = 30*scales[self.scaleName][self.degreeRotation]
             angle += angleOfRotation
         angle %= 360
 
@@ -1332,7 +1339,8 @@ class CircleAndNeckVBoxFrame(QFrame):
         Cosmetic; compute custom hue based on angle of note in circle (30° = a semi-tone)
         """
         # How about rotating colours too :-)
-        angleOfRotation = 30*scales[self.scaleName][self.rotation]
+        #rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
+        angleOfRotation = 30*scales[self.scaleName][self.degreeRotation]
         # Normalize angle to be between 0 and 360 degrees
         angle = 360*(angle/(2*math.pi))
         angle += angleOfRotation
@@ -1469,8 +1477,6 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     @Slot(int)
     def rotate_notes(self, rotation, scale):
-        self.rotation +=rotation
-        self.rotation = self.rotation%self.scaleLength
         #self.chordBeforeChange = self.chords_combobox.currentText()
         scale = sorted([(inScale +(12-scale[rotation]))%12 for inScale in scale])
         #self.draw_scale()
