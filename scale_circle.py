@@ -290,47 +290,77 @@ class NeckWindow(QDialog):
 
     def draw_neck_background(self, rootUndefined=True, inlaysType=False):
         '''
-        Draws the strings and frets background canvas
+        Draws all the elements of the neck except the notes
         '''
+        self.clear_group(self.neck_diagram_background_group)
+        self.clear_group(self.neck_diagram_inlays_group)
+
+
+        # Draw neck borders
+        self.draw_neck_borders()
+
+        # Draw frets
+        self.draw_frets()
+
+        # Draw inlays
         if not inlaysType:
             inlaysType = self.inlays_combobox.currentText()
+        self.draw_inlays(type=inlaysType) #.strandberg＊
 
+        # Draw strings
+        self.draw_strings()
+
+        if self.neck_diagram_inlays_group not in self.neck_scene.items():
+            self.neck_scene.addItem(self.neck_diagram_inlays_group)
+        if self.neck_diagram_background_group not in self.neck_scene.items():
+            self.neck_scene.addItem(self.neck_diagram_background_group)
+
+    def draw_neck_borders(self):
         neck_width  = FRET_SPACING   * (self.num_frets + 1)
         neck_height = STRING_SPACING * (self.num_strings - 1)
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
         highStringThicknessAllowance = strings_thickness[0]/20
         lowStringThicknessAllowance = strings_thickness[-1]/20
 
-        self.clear_group(self.neck_diagram_background_group)
-
-        string_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
-        string_darkGray_pen.setWidth(1)      # Set the pen width
+        darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
+        darkGray_pen.setWidth(0.5)
 
         #Draw borders of neck
         fretOvershoot = FRET_OVERSHOOT+1
-        top = QGraphicsLineItem(-15, -fretOvershoot-highStringThicknessAllowance, neck_width, -fretOvershoot-NECK_WIDENING-highStringThicknessAllowance)
-        bottom = QGraphicsLineItem(-15, neck_height+fretOvershoot+lowStringThicknessAllowance, neck_width, neck_height+fretOvershoot+NECK_WIDENING+lowStringThicknessAllowance)
-        string_darkGray_pen.setWidth(0.5)
-        top.setPen(string_darkGray_pen)
-        bottom.setPen(string_darkGray_pen)
+        # coords of begin and end of top neck border
+        xBegin = -15
+        yBegin = -fretOvershoot-highStringThicknessAllowance
+        xEnd = neck_width
+        yEnd = -fretOvershoot-NECK_WIDENING-highStringThicknessAllowance
+        # correction for fanning at the nut
+        xBegin = self.transFan(xBegin, yBegin)
+
+        top = QGraphicsLineItem(xBegin, yBegin, xEnd, yEnd)
+
+        # coords of begin and end of bottom neck border
+        xBegin = -15
+        yBegin = neck_height+fretOvershoot+lowStringThicknessAllowance
+        xEnd = neck_width
+        yEnd = neck_height+fretOvershoot+NECK_WIDENING+lowStringThicknessAllowance
+        # correction for fanning at the nut
+        xBegin = self.transFan(xBegin, yBegin)
+
+        bottom = QGraphicsLineItem(xBegin, yBegin, xEnd, yEnd)
+
+        top.setPen(darkGray_pen)
+        bottom.setPen(darkGray_pen)
         self.neck_diagram_background_group.addToGroup(top)
         self.neck_diagram_background_group.addToGroup(bottom)
 
-        # Draw inlays
-        self.draw_inlays(type=inlaysType) #.strandberg＊
+    def draw_frets(self):
+        #neck_width  = FRET_SPACING   * (self.num_frets + 1)
+        neck_height = STRING_SPACING * (self.num_strings - 1)
+        strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
+        highStringThicknessAllowance = strings_thickness[0]/20
+        lowStringThicknessAllowance = strings_thickness[-1]/20
+        #halfNeckHeight = neck_height/2
 
-        # Draw strings
-        for i in range(self.num_strings):
-            y = i * STRING_SPACING
-            widthAdjustmentProportion = (y-(neck_height/2))/(neck_height/2)
-            line = QGraphicsLineItem(-15, y, neck_width, y+(widthAdjustmentProportion*NECK_WIDENING))
-            string_darkGray_pen.setWidth(strings_thickness[i]/10.0)
-            line.setPen(string_darkGray_pen)
-            self.neck_diagram_background_group.addToGroup(line)
-
-        halfNeckHeight = neck_height/2
-
-        # Draw fret 0 and nut
+        # Draw fret 0
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(4)      # Set the pen width
         x = 0
@@ -341,8 +371,9 @@ class NeckWindow(QDialog):
         line = QGraphicsLineItem(xTop, top, xBottom, bottom)
         line.setPen(fret_darkGray_pen)
         self.neck_diagram_background_group.addToGroup(line)
+
         # draw nut
-        fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
+        #fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(10)      # Set the pen width
         x = -15
         top = -FRET_OVERSHOOT+4-highStringThicknessAllowance
@@ -354,7 +385,7 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group.addToGroup(line)
 
         # Draw frets
-        fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
+        #fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(3)      # Set the pen width
         for i in range(1, self.num_frets + 1):
             x = i * FRET_SPACING
@@ -367,11 +398,7 @@ class NeckWindow(QDialog):
             line.setPen(fret_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
-        if self.neck_diagram_background_group not in self.neck_scene.items():
-            self.neck_scene.addItem(self.neck_diagram_background_group)
-
     def draw_inlays(self, type="black_dot"):
-        self.clear_group(self.neck_diagram_inlays_group)
         neck_height = STRING_SPACING * (self.num_strings - 1)
         halfNeckHeight = neck_height/2
 
@@ -410,8 +437,31 @@ class NeckWindow(QDialog):
                     if 'pen' in inlayMark.keys():
                         inlay.setPen(inlayMark['pen'])
                     self.neck_diagram_inlays_group.addToGroup(inlay)
-        if self.neck_diagram_inlays_group not in self.neck_scene.items():
-            self.neck_scene.addItem(self.neck_diagram_inlays_group)
+
+    def draw_strings(self):
+        neck_width  = FRET_SPACING   * (self.num_frets + 1)
+        neck_height = STRING_SPACING * (self.num_strings - 1)
+        strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
+        #highStringThicknessAllowance = strings_thickness[0]/20
+        #lowStringThicknessAllowance = strings_thickness[-1]/20
+
+        string_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
+        #string_darkGray_pen.setWidth(1)      # Set the pen width
+
+        # Draw strings
+        for i in range(self.num_strings):
+            xBegin = -15
+            yBegin = i * STRING_SPACING
+            widthAdjustmentProportion = (yBegin-(neck_height/2))/(neck_height/2)
+            xEnd = neck_width
+            yEnd = yBegin+(widthAdjustmentProportion*NECK_WIDENING)
+
+            xBegin = self.transFan(xBegin, yBegin)
+
+            line = QGraphicsLineItem(xBegin, yBegin, xEnd, yEnd)
+            string_darkGray_pen.setWidth(strings_thickness[i]/10.0)
+            line.setPen(string_darkGray_pen)
+            self.neck_diagram_background_group.addToGroup(line)
 
     def draw_notes_on_neck(self, inlaysType=False):
         '''
@@ -823,7 +873,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.draw_notes_on_neck()
         # and set back degree and reference degree
         self.set_degree((degreeIndex-referenceDegreeIndex)%self.scaleLength)
-        self.set_reference_degree(degrees[referenceDegreeIndex], referenceDegreeIndex)
+        self.set_mode(degrees[referenceDegreeIndex], referenceDegreeIndex)
 
     def set_tuning(self, tuning_name, init=False):
         self.currentTuning = tunings[tuning_name]
@@ -1603,14 +1653,11 @@ class MainWindow(QMainWindow):
         '''
         set the mode of the root
         '''
-        #print("\nIn set_reference_degree mainWindow with self.referenceDegreeIndex: %s" % degreeIndex)
-        #print('In set_reference_degree mainWindow referenceDegree: %s before change'%(self.referenceDegreeIndex,))
         self.modeIndex = modeIndex
         for vFrame in self.degreesFrames:
-            vFrame.set_reference_degree(modeName, modeIndex)
+            vFrame.set_mode(modeName, modeIndex)
         if not self.neckGeneralView == "":
             self.neckGeneralView.set_mode(modeIndex)
-        #print('In set_reference_degree mainWindow referenceDegree: %s after change'%(self.referenceDegreeIndex,))
 
     def set_arrangement(self, arrangement, arrIndex):
         #print("\nIn set_arrangement mainWindow to set %s with arrIndex %s" % (arrangement, arrIndex))
@@ -1623,7 +1670,7 @@ class MainWindow(QMainWindow):
             vFrame = self.addDegreeFrame(name=name)
             # One needs to re-apply all the settings for the frames were recreated
             vFrame.set_scale(self.scales_combobox.currentText())
-            vFrame.set_reference_degree(self.mode_combobox.currentText(), self.mode_combobox.currentIndex())
+            vFrame.set_mode(self.mode_combobox.currentText(), self.mode_combobox.currentIndex())
             vFrame.set_degree(self.arrangement[i]-1)
             vFrame.set_tuning(self.tunings_combobox.currentText())
             #print("In set_arrangement to set degree: %s called %s" % (self.arrangement[i], degrees[self.arrangement[i]-1]))

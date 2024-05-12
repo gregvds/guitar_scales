@@ -17,6 +17,7 @@ class GenericNoteItem:
         self.note = ''
         self.angle = ''
         self.colour = ''
+        self.originalColour = ''
         self.embeddingWidget = embeddingWidget
         self.relatedNotesOnNeckOriginalColours = []
         self.continuouslyColoured = False
