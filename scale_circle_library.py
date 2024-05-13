@@ -22,7 +22,7 @@ class GenericNoteItem:
         self.relatedNotesOnNeckOriginalColours = []
         self.continuouslyColoured = False
 
-    def hoverEnterEvent(self, event):
+    def colourNotes(self):
         '''
         Colours momentarly all the same notes on the neck
         '''
@@ -32,9 +32,11 @@ class GenericNoteItem:
         else:
             colourCorrection = 0
         for note in self.embeddingWidget.identifiedNotes[self.note]:
+            color = None
             # If notes should be back to normal when leaving
             if self.continuouslyColoured is False:
                 note[0].originalColour = note[0].brush().color()
+                #color = note[0].brush().color()
             if hasattr(self.embeddingWidget, 'mainWindowInstance'):
                 note2 = (self.note - colourCorrection)%12
                 if note2 in referenceVFrame.notesOnCircle.keys():
@@ -43,10 +45,10 @@ class GenericNoteItem:
                     color = self.colour
             else:
                 color = self.colour
-            note[0].setBrush(color)
-        super().hoverEnterEvent(event)
+            if color:
+                note[0].setBrush(color)
 
-    def hoverLeaveEvent(self, event):
+    def uncolourNotesConditionally(self):
         '''
         Stops Colouring momentarly all the same notes on the neck
         if no continuouslyColoured set by a simple click
@@ -56,6 +58,13 @@ class GenericNoteItem:
                 if hasattr(note[0], "originalColour"):
                     note[0].setBrush(note[0].originalColour)
             self.relatedNotesOnNeckOriginalColours = []
+
+    def hoverEnterEvent(self, event):
+        self.colourNotes()
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self.uncolourNotesConditionally()
         super().hoverLeaveEvent(event)
 
     def mousePressEvent(self, event):

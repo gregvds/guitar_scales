@@ -262,6 +262,7 @@ class NeckWindow(QDialog):
         self.colour_degrees = self.degrees_colours_combobox.currentText()
         self.label_degrees_on_neck()
         self.mainWindowInstance.changeColourDegrees(self.colour_degrees)
+        self.changeNotesColours()
 
 # -----------------------------------------------------------------------------
 
@@ -562,30 +563,40 @@ class NeckWindow(QDialog):
             self.center_neck_view()
 
     def draw_tuning(self):
+        '''
+        setting the usual values and fonts
+        '''
         neck_height = STRING_SPACING * (self.num_strings - 1)
         halfNeckHeight = neck_height/2
         noteRadius = STRING_SPACING / 2.0
         notesByIndex = {value: key for key, value in notes.items()}
         tuningXPosition = (-2 * FRET_SPACING) + (FRET_SPACING / 2.0)
 
-        self.clear_group(self.neck_diagram_tuning_group)
-
         font = QFont()
         font.setFamily(FONT)
         font.setPointSize(.8*(STRING_SPACING))
         brush = QBrush(Qt.white, bs=Qt.SolidPattern)
 
+        self.clear_group(self.neck_diagram_tuning_group)
+
+        referenceVFrame = self.mainWindowInstance.degreesFrames[0]
+        colourCorrection = self.scale[referenceVFrame.currentDegree-1]-self.scale[self.modeIndex]
+
         for i in range(self.num_strings):
-            y = neck_height - (i * STRING_SPACING)
-            adjustmentForString = (y-halfNeckHeight)/halfNeckHeight #(for a 6 strings: -1, -0.6, -0.2, 0.2, 0.6, 1)
             # from low to high frets
             x = tuningXPosition
+            y = neck_height - (i * STRING_SPACING)
+            adjustmentForString = (y-halfNeckHeight)/halfNeckHeight #(for a 6 strings: -1, -0.6, -0.2, 0.2, 0.6, 1)
             adjustmentForFret = (-.5)/(self.num_frets) #(should go 0 to 1)
+            adjustment = adjustmentForString * adjustmentForFret
+            pixAdjustment = NECK_WIDENING * adjustment
+
             semitone_text = (self.currentTuning[i] -1) - self.first_root_position
             note_text = notesByIndex[(self.lowStringNoteIndex + self.currentTuning[i])%12]
 
-            adjustment = adjustmentForString * adjustmentForFret
-            pixAdjustment = NECK_WIDENING * adjustment
+            colourAngle = ((self.currentTuning[i] - self.first_root_position - colourCorrection)*math.pi/6.0)
+            brush.setColor(referenceVFrame.generate_colour_for_angle(colourAngle, includeRotation=True, colours=customColours[self.colour_degrees]))
+
 
             newY = y + pixAdjustment
             newX = self.transFan(x, newY)
@@ -593,11 +604,12 @@ class NeckWindow(QDialog):
             point = QPointF(newX, newY)
             #note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
 
-
             text_item = QGraphicsSimpleTextItem(note_text)
             text_item.setFont(font)
+            #text_item.setBrush(brush)
             text_item.setPos(point - QPointF(text_item.boundingRect().width()/2.0, text_item.boundingRect().height()/2.0))
             text_item.setFlags(QGraphicsItem.ItemIgnoresTransformations)
+
             self.neck_diagram_tuning_group.addToGroup(text_item)
 
     def label_degrees_on_neck(self):
@@ -637,7 +649,6 @@ class NeckWindow(QDialog):
             colorect = fretZeroNoteItem(rectangle, embeddingWidget=self)
 
             referenceVFrame = self.mainWindowInstance.degreesFrames[0]
-
             colourCorrection = self.scale[referenceVFrame.currentDegree-1]-self.scale[self.modeIndex]
             colourAngle = ((self.currentTuning[0] + j - self.first_root_position - colourCorrection)*math.pi/6.0)
 
@@ -649,7 +660,7 @@ class NeckWindow(QDialog):
 
             semitone = (self.currentTuning[0] + j) - self.first_root_position
             colorect.note = semitone%12
-            self.identifiedNotes[semitone%12].append([colorect, semitone, 0, j])
+            self.identifiedNotes[semitone%12].append([colorect, semitone, -1, j])
             if (semitone%12 in self.modeScale) and (self.first_root_position <= j <= self.num_frets - self.first_root_position):
                 point = QPointF(xLabel, y+3)
 
@@ -710,6 +721,16 @@ class NeckWindow(QDialog):
                         first = False
                 else:
                     text_item.hide()
+
+    def changeNotesColours(self):
+        for semitone_on_octave in self.identifiedNotes.keys():
+            for (note, semitone, i, j) in self.identifiedNotes[semitone_on_octave]:
+                if i == -1:
+                    color = note.brush().color()
+            for (note, semitone, i, j) in self.identifiedNotes[semitone_on_octave]:
+                if i != -1:
+                    note.colourNotes()
+                    note.uncolourNotesConditionally()
 
     def center_neck_view(self):
         '''
