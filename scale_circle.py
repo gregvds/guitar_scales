@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
 from PySide6.QtGui import QPolygonF, QPen, QBrush, QPainter, QAction, QFont, QColor
 import math
 
-from scale_circle_library import fretZeroNoteItem, NoteItem, TriangleNoteItem
+from scale_circle_library import fretZeroNoteItem, NoteItem, TriangleNoteItem, linkModesToScales
 from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, enrichments, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements
 from Inlays import NoBorderEllipseItem, inlays, sideInlays, customColours
 
@@ -962,7 +962,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         for index in range(self.chords_combobox.count()):
             if self.chordBeforeChange == self.chords_combobox.itemText(index):
                 self.chords_combobox.setCurrentIndex(index)
-        print("In set_degree, self.currentDegreeIndex: %s" % (self.currentDegree-1))
+        #print("In set_degree, self.currentDegreeIndex: %s" % (self.currentDegree-1))
 
     def set_mode(self, degreeName, modeIndex):
         deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.modeIndex)
@@ -971,7 +971,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         currentModeIndex = self.modeIndex
         self.modeIndex = modeIndex
 
-        print("currentModeIndex: %s" % currentModeIndex)
+        #print("currentModeIndex: %s" % currentModeIndex)
 
         if currentModeIndex > modeIndex:
             for i in range(currentModeIndex - modeIndex):
@@ -985,7 +985,7 @@ class CircleAndNeckVBoxFrame(QFrame):
             pass
         self.referenceDegree = modeIndex+1
         self.set_degree(CurrentDegreeToSet, movingRef=True)
-        print("In set_mode, self.modeIndex: %s" % self.modeIndex)
+        #print("In set_mode, self.modeIndex: %s" % self.modeIndex)
 
     def set_reference_degree(self, degreeName, degreeIndex):
         self.set_mode(degreeName, degreeIndex)
@@ -1037,8 +1037,8 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.modeName = ""
         #rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
         #DegreeLabel = degrees[(rotation - (self.referenceDegree-1))%self.scaleLength]
-        print("self.degreeRotation: %s" % self.degreeRotation)
-        print("self.modeRotation: %s" % self.modeRotation)
+        #print("self.degreeRotation: %s" % self.degreeRotation)
+        #print("self.modeRotation: %s" % self.modeRotation)
         DegreeLabel = degrees[self.degreeRotation-self.modeRotation]
         labelContent = DegreeLabel + " / " + self.modeName
         self.labelModeName.setText(labelContent)
@@ -1548,6 +1548,7 @@ class MainWindow(QMainWindow):
         self.scaleLength = 0
 
         self.modeIndex = 0
+        self.modesListByScaleDic = linkModesToScales()
 
         self.currentTuningName = ""
 
@@ -1565,7 +1566,7 @@ class MainWindow(QMainWindow):
 
         # Initialisation
         self.set_scale("Natural")
-        self.set_mode("I", 0)
+        self.set_mode("I - Ionian (major)", 0)
         self.set_arrangement("I", 0)
         self.set_tuning("Standard 6 \tEADGBE")
         self.update()
@@ -1677,17 +1678,21 @@ class MainWindow(QMainWindow):
         '''
         # keep record of set mode
         currentMode = self.mode_combobox.currentText()
+        currentModeIndex = self.mode_combobox.currentIndex()
         foundCurrentMode = False
+        self.modesListByScaleDic
         # clean and fill mode_combobox
         for i in range(self.mode_combobox.count()):
             self.mode_combobox.removeItem(0)
         for i in range(len(degrees)):
             if i < self.scaleLength:
-                self.mode_combobox.addItem(degrees[i])
-                if (degrees[i] == currentMode) and (not foundCurrentMode):
+                modeName = self.modesListByScaleDic[self.scaleName][i]
+                mode_text = degrees[i] + "\t" + modeName
+                self.mode_combobox.addItem(mode_text)
+                if (i == currentModeIndex) and (not foundCurrentMode):
                     foundCurrentMode = True
         if foundCurrentMode:
-            self.mode_combobox.setCurrentText(currentMode)
+            self.mode_combobox.setCurrentIndex(currentModeIndex)
 
     def add_arrangements_to_combobox(self):
         '''
@@ -1706,9 +1711,9 @@ class MainWindow(QMainWindow):
         '''
         self.scaleName = scale_name
         self.scale = scales[self.scaleName]
-        if len(self.scale) != self.scaleLength:
-            self.scaleLength = len(self.scale)
-            self.add_compatible_modes_in_Combobox()
+        #if len(self.scale) != self.scaleLength:
+        self.scaleLength = len(self.scale)
+        self.add_compatible_modes_in_Combobox()
         self.scaleLength = len(self.scale)
         for vFrame in self.degreesFrames:
             vFrame.set_scale(scale_name)

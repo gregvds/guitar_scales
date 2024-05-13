@@ -8,7 +8,7 @@
 # -----------------------------------------------------------------------------
 
 from PySide6.QtWidgets import QGraphicsPolygonItem, QGraphicsEllipseItem
-from catalogs import scales
+from catalogs import scales, modes
 
 # -----------------------------------------------------------------------------
 
@@ -85,5 +85,17 @@ fretZeroNoteItem = PolgonNoteItem
 NoteItem = RounNoteItem
 TriangleNoteItem = PolgonNoteItem
 
+def linkModesToScales():
+    modesListByScaleDic = dict()
+    for scaleName in scales.keys():
+        modesListByScaleDic[scaleName] = list()
+        scale =  scales[scaleName]
+        scaleLength = len(scale)
+        rotatedScale = scale
+        for i in range(scaleLength):
+            if tuple(rotatedScale) in modes.keys():
+                modesListByScaleDic[scaleName].append(modes[tuple(rotatedScale)])
+            rotatedScale = sorted([(inScale +(12-rotatedScale[1]))%12 for inScale in rotatedScale])
+    return modesListByScaleDic
 
 # -----------------------------------------------------------------------------
