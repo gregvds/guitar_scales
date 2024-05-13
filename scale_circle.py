@@ -75,6 +75,8 @@ class NeckWindow(QDialog):
 
         self.create_graphic_item_groups()
 
+        self.identifiedNotes = dict()
+
         # Initialisation
         self.set_tuning(self.mainWindowInstance.currentTuningName, init=True)
         self.set_scale(self.mainWindowInstance.scaleName)
@@ -112,13 +114,13 @@ class NeckWindow(QDialog):
         '''
         self.show_root_checkbox = QCheckBox("Show roots")
         self.show_root_checkbox.setChecked(True)
-        self.show_root_checkbox.toggled.connect(self.draw_notes_on_neck)
+        self.show_root_checkbox.toggled.connect(self.draw_fanned_neck)
         self.fan_frets_checkbox = QCheckBox("Fanned frets")
         self.fan_frets_checkbox.setChecked(False)
         self.fan_frets_checkbox.toggled.connect(self.draw_fanned_neck)
         self.tuning_checkbox = QCheckBox("Tuning")
         self.tuning_checkbox.setChecked(False)
-        self.tuning_checkbox.toggled.connect(self.draw_notes_on_neck)
+        self.tuning_checkbox.toggled.connect(self.draw_fanned_neck)
         vBoxLayout = QVBoxLayout()
         vBoxLayout.addWidget(self.show_root_checkbox)
         vBoxLayout.addWidget(self.fan_frets_checkbox)
@@ -157,7 +159,7 @@ class NeckWindow(QDialog):
         self.inlays_combobox = QComboBox()
         self.inlays_combobox.addItems(inlays.keys())
         self.inlays_combobox.setCurrentText(".strandberg＊")
-        self.inlays_combobox.currentTextChanged.connect(lambda: self.draw_notes_on_neck())
+        self.inlays_combobox.currentTextChanged.connect(lambda: self.draw_fanned_neck())
         self.inlays_combobox.highlighted.connect(self.show_highlighted_inlays)
         vBoxLayout = QVBoxLayout()
         vBoxLayout.addWidget(label)
@@ -491,6 +493,7 @@ class NeckWindow(QDialog):
 
         self.draw_neck_background(inlaysType=inlaysType)
 
+        self.keepNotesColouringParameters()
         self.identifiedNotes = {each: list() for each in range(12)}
         self.clear_group(self.neck_diagram_notes_group)
 
@@ -553,8 +556,10 @@ class NeckWindow(QDialog):
                     note_point.note = semitone_text%12
                     note_point.setPen(QPen(Qt.transparent))
                     self.identifiedNotes[semitone_text % 12].append([note_point, semitone_text, i, j])
+
                     self.neck_diagram_notes_group.addToGroup(note_point)
         self.color_notes_by_default()
+        self.applyNotesColouringParameters()
         if self.neck_diagram_notes_group not in self.neck_scene.items():
             self.neck_scene.addItem(self.neck_diagram_notes_group)
         if self.once:
@@ -697,6 +702,28 @@ class NeckWindow(QDialog):
         if group in self.neck_scene.items():
             self.neck_scene.removeItem(group)
 
+    def keepNotesColouringParameters(self):
+        self.notesColouringParameters = dict()
+        for semitone_on_octave in self.identifiedNotes.keys():
+            self.notesColouringParameters[semitone_on_octave] = list()
+            for (note, semitone, i, j) in self.identifiedNotes[semitone_on_octave]:
+                continuouslyColoured = note.continuouslyColoured
+                originalColour = note.originalColour
+                colour = note.colour
+                self.notesColouringParameters[semitone_on_octave].append((semitone, i, j, continuouslyColoured, originalColour, colour))
+
+    def applyNotesColouringParameters(self):
+        for semitone_on_octave in self.identifiedNotes.keys():
+            for (note, semitone, i, j) in self.identifiedNotes[semitone_on_octave]:
+                if semitone_on_octave in self.notesColouringParameters.keys():
+                    for (semitone_old, i_old, j_old, continuouslyColoured, originalColour, colour) in self.notesColouringParameters[semitone_on_octave]:
+                        if semitone==semitone_old and i==i_old and j==j_old:
+                            note.continuouslyColoured = continuouslyColoured
+                            note.originalColour = originalColour
+                            note.colour = colour
+
+
+
     def color_notes_by_default(self):
         transblack = QColor(Qt.black)
         transblack.setAlpha(128)
@@ -761,7 +788,7 @@ class NeckWindow(QDialog):
 
     @Slot(int)
     def show_highlighted_inlays(self, index):
-        self.draw_notes_on_neck(inlaysType=self.inlays_combobox.itemText(index))
+        self.draw_fanned_neck(inlaysType=self.inlays_combobox.itemText(index))
 
 
 
