@@ -28,7 +28,7 @@ class GenericNoteItem:
         '''
         if hasattr(self.embeddingWidget, "mainWindowInstance"):
             referenceVFrame = self.embeddingWidget.mainWindowInstance.degreesFrames[0]
-            colourCorrection = self.embeddingWidget.scale[referenceVFrame.currentDegree-1]-self.embeddingWidget.scale[self.embeddingWidget.modeIndex]
+            colourCorrection = self.embeddingWidget.scale[referenceVFrame.degreeIndex]-self.embeddingWidget.scale[self.embeddingWidget.modeIndex]
         else:
             colourCorrection = 0
         for note in self.embeddingWidget.identifiedNotes[self.note]:

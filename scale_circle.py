@@ -131,7 +131,7 @@ class NeckWindow(QDialog):
         self.fan_apex_slider.setMinimum(0)
         self.fan_apex_slider.setMaximum(FRET_SPACING   * (self.num_frets + 1))
         self.fan_apex_slider.setValue(FRET_SPACING * 1)
-        self.fan_apex_slider.setGeometry(-15, -2*STRING_SPACING, FRET_SPACING*(self.num_frets)+15, STRING_SPACING)
+        self.fan_apex_slider.setGeometry(-15, -2*STRING_SPACING, FRET_SPACING*(self.num_frets)+30, STRING_SPACING)
         self.fan_apex_slider.setStyleSheet("background: transparent;\nhandle: { width: 5px; height: 5px; margin: -3px 0;}")
         self.fan_apex_slider.valueChanged.connect(self.draw_fanned_neck)
         self.fan_apex_slider.hide()
@@ -241,13 +241,13 @@ class NeckWindow(QDialog):
         firstTuningNote = ''
         if len(tuningNotesComposition)>0:
             if tuningNotesComposition[0][1] == '♯':
-                print("debug 0")
+                #print("debug 0")
                 firstTuningNote = notesByIndex[notes[tuningNotesComposition[0][0]]+1]
             elif tuningNotesComposition[0][1] == '♭':
-                print("debug 1")
+                #print("debug 1")
                 firstTuningNote = notesByIndex[notes[tuningNotesComposition[0][0]]-1]
             else:
-                print("debug 3")
+                #print("debug 3")
                 firstTuningNote = tuningNotesComposition[0][0]
         firstTuningNoteValue = notes[firstTuningNote]
         self.lowStringNoteIndex = firstTuningNoteValue
@@ -585,7 +585,7 @@ class NeckWindow(QDialog):
         self.clear_group(self.neck_diagram_tuning_group)
 
         referenceVFrame = self.mainWindowInstance.degreesFrames[0]
-        colourCorrection = self.scale[referenceVFrame.currentDegree-1]-self.scale[self.modeIndex]
+        colourCorrection = self.scale[referenceVFrame.degreeIndex]-self.scale[self.modeIndex]
 
         for i in range(self.num_strings):
             # from low to high frets
@@ -654,7 +654,7 @@ class NeckWindow(QDialog):
             colorect = fretZeroNoteItem(rectangle, embeddingWidget=self)
 
             referenceVFrame = self.mainWindowInstance.degreesFrames[0]
-            colourCorrection = self.scale[referenceVFrame.currentDegree-1]-self.scale[self.modeIndex]
+            colourCorrection = self.scale[referenceVFrame.degreeIndex]-self.scale[self.modeIndex]
             colourAngle = ((self.currentTuning[0] + j - self.first_root_position - colourCorrection)*math.pi/6.0)
 
             brush.setColor(referenceVFrame.generate_colour_for_angle(colourAngle, includeRotation=True, colours=customColours[self.colour_degrees]))
@@ -819,9 +819,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         # in the code, we'll use indexes (0 to 6) so we can %7 on them
         # the reference degree is the root position in the scale
         # the current degree is the used degree of the scale in the arrangement
-        self.referenceDegree = 1
-        self.currentDegree = degree
-        self.modeRotation = 0
+        self.degreeIndex = degree - 1
         self.degreeRotation = 0
 
         self.scaleName = ""
@@ -830,6 +828,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.notesOnCircle = {}
 
         self.modeIndex = 0
+        self.modeRotation = 0
         self.modeScale = list()
 
         self.colour_degrees = self.topApp.colour_degrees
@@ -956,13 +955,13 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def set_scale(self, scale_name):
         # Keeping current degree, rotation and ref degree
-        degreeIndex = self.currentDegree - 1
-        referenceDegreeIndex = self.referenceDegree - 1
-        #rotation = self.rotation
+        degreeIndex = self.degreeIndex
+        modeIndex = self.modeIndex
         # init before scale change
-        self.currentDegree = 1
-        self.referenceDegree = 1
+        self.degreeIndex = 0
+
         self.modeIndex = 0
+
         self.modeRotation = 0
         self.degreeRotation = 0
         # scale change
@@ -971,8 +970,9 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.modeScale = scales[self.scaleName]
         self.scaleLength = len(self.shownScale)
         # and set back degree and mode
-        self.set_mode(degrees[referenceDegreeIndex], referenceDegreeIndex)
-        self.set_degree((degreeIndex-referenceDegreeIndex)%self.scaleLength)
+        self.set_mode(modeIndex)
+        self.set_degree((degreeIndex-modeIndex)%self.scaleLength)
+
 
         self.draw_scale()
         self.draw_notes_on_neck()
@@ -986,9 +986,9 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def set_degree(self, degreeIndex, movingRef=False):
         if not movingRef:
-            degreeIndex = (degreeIndex + (self.referenceDegree - 1))%self.scaleLength
-        currentDegreeIndex = self.currentDegree-1
-        self.currentDegree = degreeIndex+1
+            degreeIndex = (degreeIndex + self.modeIndex)%self.scaleLength
+        currentDegreeIndex = self.degreeIndex
+        self.degreeIndex = degreeIndex
 
         # keep current selected chord if any
         self.chordBeforeChange = self.chords_combobox.currentText()
@@ -1010,16 +1010,13 @@ class CircleAndNeckVBoxFrame(QFrame):
         for index in range(self.chords_combobox.count()):
             if self.chordBeforeChange == self.chords_combobox.itemText(index):
                 self.chords_combobox.setCurrentIndex(index)
-        #print("In set_degree, self.currentDegreeIndex: %s" % (self.currentDegree-1))
 
-    def set_mode(self, degreeName, modeIndex):
-        deltaCurrentDegreeToReference = (self.currentDegree-1)-(self.modeIndex)
-        CurrentDegreeToSet = (modeIndex+deltaCurrentDegreeToReference)%self.scaleLength
+    def set_mode(self, modeIndex):
+        deltaDegreeToMode = (self.degreeIndex)-(self.modeIndex)
+        CurrentDegreeToSet = (modeIndex+deltaDegreeToMode)%self.scaleLength
 
         currentModeIndex = self.modeIndex
         self.modeIndex = modeIndex
-
-        #print("currentModeIndex: %s" % currentModeIndex)
 
         if currentModeIndex > modeIndex:
             for i in range(currentModeIndex - modeIndex):
@@ -1031,12 +1028,8 @@ class CircleAndNeckVBoxFrame(QFrame):
                 self.modeRotation = (self.modeRotation+1)%self.scaleLength
         else:
             pass
-        self.referenceDegree = modeIndex+1
         self.set_degree(CurrentDegreeToSet, movingRef=True)
-        #print("In set_mode, self.modeIndex: %s" % self.modeIndex)
 
-    def set_reference_degree(self, degreeName, degreeIndex):
-        self.set_mode(degreeName, degreeIndex)
 
 # -----------------------------------------------------------------------------
 
@@ -1083,10 +1076,6 @@ class CircleAndNeckVBoxFrame(QFrame):
             self.modeName = modes[tuple(scale)]
         else:
             self.modeName = ""
-        #rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
-        #DegreeLabel = degrees[(rotation - (self.referenceDegree-1))%self.scaleLength]
-        #print("self.degreeRotation: %s" % self.degreeRotation)
-        #print("self.modeRotation: %s" % self.modeRotation)
         DegreeLabel = degrees[self.degreeRotation-self.modeRotation]
         labelContent = DegreeLabel + " / " + self.modeName
         self.labelModeName.setText(labelContent)
@@ -1297,16 +1286,9 @@ class CircleAndNeckVBoxFrame(QFrame):
             rootNote = self.get_root_note()
         if rootNote!='':
             rootNoteIndex = notes[rootNote]
-            #print("\n      Rootnote index: %s"%rootNoteIndex)
-            #print("      root scale:")
-            #print(scales[self.scaleName])
-            #print("      self.referenceDegreeIndex: %s" % (self.referenceDegree-1))
-            #print("      self.currentDegreeIndex: %s" % (self.currentDegree-1))
-            degree = self.currentDegree - self.referenceDegree
-            noteIndex = (rootNoteIndex + self.modeScale[degree]) % 12
-            #print("      noteIndex: %s"%noteIndex)
+            degreeIndex = self.degreeIndex - self.modeIndex
+            noteIndex = (rootNoteIndex + self.modeScale[degreeIndex]) % 12
             note = {value: key for key, value in notes.items()}[noteIndex]
-            #print("      note: %s" % note)
             return note
         return ''
 
@@ -1774,12 +1756,11 @@ class MainWindow(QMainWindow):
         '''
         self.modeIndex = modeIndex
         for vFrame in self.degreesFrames:
-            vFrame.set_mode(modeName, modeIndex)
+            vFrame.set_mode(modeIndex)
         if not self.neckGeneralView == "":
             self.neckGeneralView.set_mode(modeIndex)
 
     def set_arrangement(self, arrangement, arrIndex):
-        #print("\nIn set_arrangement mainWindow to set %s with arrIndex %s" % (arrangement, arrIndex))
         self.arrangementString = arrangement
         self.arrangement = degreeArrangements[arrIndex]
         self.clearDegreeFrames()
@@ -1789,16 +1770,10 @@ class MainWindow(QMainWindow):
             vFrame = self.addDegreeFrame(name=name)
             # One needs to re-apply all the settings for the frames were recreated
             vFrame.set_scale(self.scales_combobox.currentText())
-            vFrame.set_mode(self.mode_combobox.currentText(), self.mode_combobox.currentIndex())
+            vFrame.set_mode(self.mode_combobox.currentIndex())
             vFrame.set_degree(self.arrangement[i]-1)
             vFrame.set_tuning(self.tunings_combobox.currentText())
-            #print("In set_arrangement to set degree: %s called %s" % (self.arrangement[i], degrees[self.arrangement[i]-1]))
-            #print("In set_arrangement with self.referenceDegreeIndex: %s" % self.referenceDegreeIndex)
             vFrame.show()
-            #print('In set_arrangement mainWindow for %s with reference degree value: %s before setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
-            #print('In set_arrangement mainWindow for %s with current   degree value: %s before setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].currentDegree))
-            #print('In set_arrangement mainWindow for %s with reference degree value: %s after setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].referenceDegree))
-            #print('In set_arrangement mainWindow for %s with current   degree value: %s after setDegree' % (self.degreesFrames[i].name, self.degreesFrames[i].currentDegree))
         if not self.neckGeneralView == "":
             self.neckGeneralView.set_arrangement(self.arrangement)
 
@@ -1849,9 +1824,9 @@ class MainWindow(QMainWindow):
         self.neckGeneralView.refresh()
 
     def refresh(self):
-        print("\nIn mainWindow refresh")
+        #print("\nIn mainWindow refresh")
         for vFrame in self.degreesFrames:
-            print("In mainWindow refresh, passing refresh to %s" % vFrame.name)
+            #print("In mainWindow refresh, passing refresh to %s" % vFrame.name)
             vFrame.refresh()
         if not self.neckGeneralView == '':
             self.neckGeneralView.refresh()
