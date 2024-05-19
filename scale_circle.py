@@ -9,10 +9,11 @@
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QGraphicsView, QGraphicsScene
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsItemGroup, QGraphicsEllipseItem, QGraphicsSimpleTextItem, QGraphicsLineItem
-from PySide6.QtWidgets import QDialog, QPushButton, QCheckBox, QRadioButton, QComboBox, QSlider, QMenu, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QGraphicsBlurEffect
+from PySide6.QtWidgets import QDialog, QPushButton, QCheckBox, QRadioButton, QComboBox, QSlider, QMenu, QLabel, QGridLayout, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QGraphicsBlurEffect
 from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
 from PySide6.QtGui import QPolygonF, QPen, QBrush, QPainter, QAction, QFont, QColor
 import math
+import itertools
 
 from scale_circle_library import fretZeroNoteItem, NoteItem, TriangleNoteItem, linkModesToScales
 from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, enrichments, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements
@@ -81,8 +82,6 @@ class NeckWindow(QDialog):
         self.set_tuning(self.mainWindowInstance.currentTuningName, init=True)
         self.set_scale(self.mainWindowInstance.scaleName)
 
-        # Enable antialiasing
-        self.neck_graphics_view.setRenderHint(QPainter.Antialiasing)
 
 # -----------------------------------------------------------------------------
 
@@ -93,6 +92,7 @@ class NeckWindow(QDialog):
         self.mainVBoxLayout.addLayout(self.topHBoxLayout)
 
         self.neck_graphics_view = QGraphicsView()
+        self.neck_graphics_view.setRenderHint(QPainter.Antialiasing)
         self.neck_graphics_view.viewport().setAutoFillBackground(True)
         palette = self.neck_graphics_view.viewport().palette()
         palette.setColor(self.neck_graphics_view.viewport().backgroundRole(), Qt.lightGray)
@@ -269,11 +269,7 @@ class NeckWindow(QDialog):
 # -----------------------------------------------------------------------------
 
     def rotate_mode_scale(self, rotation):
-        # rotation 1 = rotate counterclockwize
-        # rotation -1 = rotate clockwize
         self.modeScale = sorted([(inScale +(12-self.modeScale[rotation]))%12 for inScale in self.modeScale])
-        print("in rotate_mode_scale, modeScale:")
-        print(self.modeScale)
 
 # -----------------------------------------------------------------------------
 
@@ -296,6 +292,7 @@ class NeckWindow(QDialog):
             self.fanBase   = self.fan_apex_slider.value()
             self.fanHeight = (60 - (self.num_strings-6)*20) * (STRING_SPACING * (self.num_strings - 1))
             self.fan_apex_slider.show()
+            self.inlays_combobox.setCurrentText(".strandberg＊")
         else:
             self.fanBase   = 0
             self.fanHeight = 1000000
@@ -320,7 +317,7 @@ class NeckWindow(QDialog):
         # Draw inlays
         if not inlaysType:
             inlaysType = self.inlays_combobox.currentText()
-        self.draw_inlays(type=inlaysType) #.strandberg＊
+        self.draw_inlays(type=inlaysType)
 
         # Draw strings
         self.draw_strings()
@@ -356,6 +353,8 @@ class NeckWindow(QDialog):
         xBegin = self.transFan(xBegin, yBegin)
 
         top = QGraphicsLineItem(xBegin, yBegin, xEnd, yEnd)
+        top.setPen(darkGray_pen)
+        self.neck_diagram_background_group.addToGroup(top)
 
         # coords of begin and end of bottom neck border
         xBegin = -15
@@ -366,19 +365,14 @@ class NeckWindow(QDialog):
         xBegin = self.transFan(xBegin, yBegin)
 
         bottom = QGraphicsLineItem(xBegin, yBegin, xEnd, yEnd)
-
-        top.setPen(darkGray_pen)
         bottom.setPen(darkGray_pen)
-        self.neck_diagram_background_group.addToGroup(top)
         self.neck_diagram_background_group.addToGroup(bottom)
 
     def draw_frets(self):
-        #neck_width  = FRET_SPACING   * (self.num_frets + 1)
         neck_height = STRING_SPACING * (self.num_strings - 1)
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
         highStringThicknessAllowance = strings_thickness[0]/20
         lowStringThicknessAllowance = strings_thickness[-1]/20
-        #halfNeckHeight = neck_height/2
 
         # Draw fret 0
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
@@ -393,7 +387,6 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group.addToGroup(line)
 
         # draw nut
-        #fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(10)      # Set the pen width
         x = -15
         top = -FRET_OVERSHOOT+4-highStringThicknessAllowance
@@ -405,7 +398,6 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group.addToGroup(line)
 
         # Draw frets
-        #fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
         fret_darkGray_pen.setWidth(3)      # Set the pen width
         for i in range(1, self.num_frets + 1):
             x = i * FRET_SPACING
@@ -428,7 +420,6 @@ class NeckWindow(QDialog):
 
         for i in range(0, self.num_frets):
             adjustmentForFret = NECK_WIDENING*i/self.num_frets
-
             # Neck Inlays
             if i in inlays[type].keys():
                 for inlayMark in inlays[type][i]:
@@ -553,6 +544,7 @@ class NeckWindow(QDialog):
                     else:
                         # playable Notes shown as cercles
                         note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
+
                     note_point.note = semitone_text%12
                     note_point.setPen(QPen(Qt.transparent))
                     self.identifiedNotes[semitone_text % 12].append([note_point, semitone_text, i, j])
@@ -602,16 +594,13 @@ class NeckWindow(QDialog):
             colourAngle = ((self.currentTuning[i] - self.first_root_position - colourCorrection)*math.pi/6.0)
             brush.setColor(referenceVFrame.generate_colour_for_angle(colourAngle, includeRotation=True, colours=customColours[self.colour_degrees]))
 
-
             newY = y + pixAdjustment
             newX = self.transFan(x, newY)
 
             point = QPointF(newX, newY)
-            #note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
 
             text_item = QGraphicsSimpleTextItem(note_text)
             text_item.setFont(font)
-            #text_item.setBrush(brush)
             text_item.setPos(point - QPointF(text_item.boundingRect().width()/2.0, text_item.boundingRect().height()/2.0))
             text_item.setFlags(QGraphicsItem.ItemIgnoresTransformations)
 
@@ -698,7 +687,6 @@ class NeckWindow(QDialog):
             if item in self.neck_scene.items():
                 self.neck_scene.removeItem(item)
             group.removeFromGroup(item)
-
         if group in self.neck_scene.items():
             self.neck_scene.removeItem(group)
 
@@ -722,8 +710,6 @@ class NeckWindow(QDialog):
                             note.originalColour = originalColour
                             note.colour = colour
 
-
-
     def color_notes_by_default(self):
         transblack = QColor(Qt.black)
         transblack.setAlpha(128)
@@ -744,7 +730,6 @@ class NeckWindow(QDialog):
                     else:
                         text_item.hide()
                     if firstOnly:
-                        # We only work with the first given position of all the ones identified
                         first = False
                 else:
                     text_item.hide()
@@ -839,6 +824,9 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         self.identifiedNotes = {}
 
+        self.chordIndex = 0
+        self.chord_positions = list()
+
         # Draw circle and guitar neck backgrounds
         self.draw_scale_circle()
 
@@ -919,11 +907,18 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.chords_combobox = QComboBox()
         self.chords_combobox.currentTextChanged.connect(lambda: self.show_chord())
         self.chords_combobox.highlighted.connect(self.show_highlighted_chord)
+        self.alt_chords = QPushButton("Alt")
+        self.alt_chords.setEnabled(False)
+        self.alt_chords.clicked.connect(lambda: self.show_alternate_chord())
 
-        chordVBoxLayout = QVBoxLayout()
-        chordVBoxLayout.addWidget(self.chordLabel)
-        chordVBoxLayout.addWidget(self.chords_combobox)
-        self.centralHBoxLayout.addLayout(chordVBoxLayout)
+        self.chordGridLayout = QGridLayout()
+        #chordVBoxLayout = QVBoxLayout()
+        self.chordGridLayout.addWidget(self.chordLabel, 0, 0, 1, 2)
+        #chordHBoxLayout = QHBoxLayout()
+        self.chordGridLayout.addWidget(self.chords_combobox, 1, 0)
+        self.chordGridLayout.addWidget(self.alt_chords, 1, 1)
+        #chordVBoxLayout.addLayout(chordHBoxLayout)
+        self.centralHBoxLayout.addLayout(self.chordGridLayout)
 
     def create_strings_number_for_chords_buttons(self):
         up_button = QPushButton("↑", self)
@@ -936,10 +931,10 @@ class CircleAndNeckVBoxFrame(QFrame):
         down_button.setMinimumWidth(30)
         down_button.setMaximumWidth(40)
 
-        stringsPushButtonsVBoxLayout = QVBoxLayout()
-        stringsPushButtonsVBoxLayout.addWidget(up_button)
-        stringsPushButtonsVBoxLayout.addWidget(down_button)
-        self.centralHBoxLayout.addLayout(stringsPushButtonsVBoxLayout)
+        #stringsPushButtonsVBoxLayout = QVBoxLayout()
+        self.chordGridLayout.addWidget(up_button, 0, 2)
+        self.chordGridLayout.addWidget(down_button, 1, 2)
+        #self.centralHBoxLayout.addLayout(stringsPushButtonsVBoxLayout)
 
     def create_graphic_item_groups(self):
         # Groups to hold graphical parts such as general background, note points, line items and center pivot
@@ -957,13 +952,14 @@ class CircleAndNeckVBoxFrame(QFrame):
         # Keeping current degree, rotation and ref degree
         degreeIndex = self.degreeIndex
         modeIndex = self.modeIndex
+
         # init before scale change
         self.degreeIndex = 0
-
         self.modeIndex = 0
 
-        self.modeRotation = 0
         self.degreeRotation = 0
+        self.modeRotation = 0
+
         # scale change
         self.scaleName = scale_name
         self.shownScale = scales[self.scaleName]
@@ -972,7 +968,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         # and set back degree and mode
         self.set_mode(modeIndex)
         self.set_degree((degreeIndex-modeIndex)%self.scaleLength)
-
 
         self.draw_scale()
         self.draw_notes_on_neck()
@@ -1326,11 +1321,8 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def interpolate_colors(self, color1, color2, ratio):
         # Convert hex colors to RGB
-        color1 = color1.lstrip('#')
-        color2 = color2.lstrip('#')
-
-        rgb_color1 = tuple(int(color1[i:i+2], 16) for i in (0, 2, 4))
-        rgb_color2 = tuple(int(color2[i:i+2], 16) for i in (0, 2, 4))
+        rgb_color1 = self.hex_to_rgb(color1)
+        rgb_color2 = self.hex_to_rgb(color2)
 
         # Interpolate between RGB values based on the ratio
         interpolated_rgb = tuple(int(color1 + (color2 - color1) * ratio) for color1, color2 in zip(rgb_color1, rgb_color2))
@@ -1358,18 +1350,15 @@ class CircleAndNeckVBoxFrame(QFrame):
         colour = self.interpolate_colors(colours[index1], colours[index2], ratio)
         return colour
 
+    def hex_to_rgb(self, hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
     def hex_to_qcolor(self, hex_color):
         # Remove '#' from the beginning of the hexadecimal string if present
-        hex_color = hex_color.lstrip('#')
-
-        # Convert hexadecimal color code to RGB values
-        red = int(hex_color[0:2], 16)
-        green = int(hex_color[2:4], 16)
-        blue = int(hex_color[4:6], 16)
-
+        color = self.hex_to_rgb(hex_color)
         # Create a QColor object with the RGB values
-        qcolor = QColor(red, green, blue)
-
+        qcolor = QColor(color[0], color[1], color[2])
         return qcolor
 
     def angle_to_hue(self, angle):
@@ -1377,7 +1366,6 @@ class CircleAndNeckVBoxFrame(QFrame):
         Cosmetic; compute custom hue based on angle of note in circle (30° = a semi-tone)
         """
         # How about rotating colours too :-)
-        #rotation = (self.modeRotation + self.degreeRotation)%self.scaleLength
         angleOfRotation = 30*scales[self.scaleName][self.degreeRotation]
         # Normalize angle to be between 0 and 360 degrees
         angle = 360*(angle/(2*math.pi))
@@ -1439,56 +1427,97 @@ class CircleAndNeckVBoxFrame(QFrame):
                 line_item.setPen(colour_pen)
 
     def color_chord_notes(self, chord):
-        white_pen = QPen(Qt.white)
-        gray_pen = QPen(Qt.gray)
-        trans_pen = QPen(Qt.transparent)
-        notes_potential_positions = {}
-        strings_potential_positions = {}
-        reserved_string_for_note = {}
-        # for each note in chord
-        for note in chord:
-            notes_potential_positions[note] = []
-            # for each position of the note
-            for (note_point, semitone_text, string, fret, text_note) in self.identifiedNotes[note%12]:
-                # if on an authorized string not already occupied
-                if (self.lowStringLimit-1 <= string <= self.highStringLimit-1) and (string not in reserved_string_for_note.keys()):
-                    if 0 <= semitone_text <= semitonesToConsiderByNumberOfStrings[self.num_strings]:
-                        # if note not Root on the first low string
-                        if note > 0 and string == 0:
-                            pass
-                        # we keep the position as a potential position
-                        else:
-                            if fret < 6:
-                                notes_potential_positions[note].append((string, fret, note_point, text_note))
-            # if note found only in one position
-            if len(notes_potential_positions[note]) == 1:
-                # we reserve that string for that note
-                reserved_string_for_note[notes_potential_positions[note][0][0]] = note
-
-            for (note_point, line_item, note_colour) in self.notesOnCircle[note%12]:
-                colour_pen = QPen(note_colour)
-                colour_pen.setWidth(3)
-                line_item.setPen(colour_pen)
-
-        for note in chord:
-            for each_position in notes_potential_positions[note]:
-                # if more than one possible positions for a note
-                if len(notes_potential_positions[note])>1:
-                    # but passed if this position string already reserved
-                    if each_position[0] in reserved_string_for_note.keys():
-                        pass
-                    else:
-                        each_position[2].setBrush(Qt.white)
-                        each_position[2].setPen(trans_pen)
-                        each_position[3].setBrush(Qt.black)
-                else:
-                    each_position[2].setBrush(Qt.white)
-                    each_position[2].setPen(trans_pen)
-                    each_position[3].setBrush(Qt.black)
+        notes_positions = self.get_positions_of_chord_notes(chord)
+        self.chord_positions = self.get_positions_combinations_for_chord(chord, notes_positions)
+        self.colour_chord(self.chord_positions)
 
     def changeColourDegrees(self, colour):
         self.colour_degrees = colour
         self.refresh()
+
+    def get_positions_of_chord_notes(self, chord):
+        notes_positions = {}
+        for note in chord:
+            notes_positions[note] = []
+            # for each position of the note
+            for (note_marker, semitone, string, fret, note_label) in self.identifiedNotes[note%12]:
+                authorizedString = (self.lowStringLimit-1 <= string <= self.highStringLimit-1)
+                authorizedFret = (fret < 6)
+                authorizedSemitoneByNumberOfStrings = (0 <= semitone <= semitonesToConsiderByNumberOfStrings[self.num_strings])
+                if authorizedString and authorizedFret and authorizedSemitoneByNumberOfStrings:
+                    notes_positions[note].append((string, fret, note_marker, note_label))
+        return notes_positions
+
+    def get_positions_combinations_for_chord(self, chord, notes_positions):
+        # detection of note of chord with a single position
+        reserved_strings_for_note = {}
+        for note in chord:
+            if len(notes_positions[note]) == 1:
+                reserved_strings_for_note[notes_positions[note][0][2]] = note
+
+        # notes positions that respect the single position of other notes
+        notes_positions_respecting_notes_with_single_occurence = {}
+        for note in chord:
+            #notes_positions_respecting_notes_with_single_occurence[note] = []
+            for (string, fret, note_marker, note_label) in notes_positions[note]:
+                reservedString = (string in reserved_strings_for_note.keys())
+                # we keep the note in all cases except when the string is reserved but the note does not correspond
+                if not (reservedString and not (reserved_strings[string] == note)):
+                    if not string in notes_positions_respecting_notes_with_single_occurence.keys():
+                        notes_positions_respecting_notes_with_single_occurence[string] = []
+                    notes_positions_respecting_notes_with_single_occurence[string].append((note, fret, note_marker, note_label))
+
+        # Generate all the possible notes position combinations
+        # Create a new list where each tuple is paired with its key
+        notes_positions_with_note = {string: [(string, note, fret, note_marker, note_label) for (note, fret, note_marker, note_label) in tuples] for string, tuples in notes_positions_respecting_notes_with_single_occurence.items()}
+        # Extract the keyed lists
+        stringIndexesSorted = sorted(notes_positions_with_note.keys())
+        #lists = list(notes_positions_with_note.values())
+        lists = [notes_positions_with_note[stringIndex] for stringIndex in stringIndexesSorted]
+        # Use itertools.product to generate combinations of keyed tuples
+        potential_chord_positions = list(itertools.product(*lists))
+
+        # We need to eliminate all the combinations that do not have all the note of the chord
+
+        #print('\n')
+        #print(chord)
+        potential_complete_chord_positions = []
+        for potential_chord_position in potential_chord_positions:
+            foundAllNote = True
+            for note in chord:
+                foundNote = False
+                for (string, noteOnNeck, fret, note_marker, note_label) in potential_chord_position:
+                    foundNote = (foundNote or (noteOnNeck == note))
+                foundAllNote = (foundAllNote and foundNote)
+            if foundAllNote:
+                potential_complete_chord_positions.append(potential_chord_position)
+
+        # We need to compute the intrinsic distance of the chord position to rank them
+        # distance will be the sum of the absolute difference of fret from one string to the next
+        weighted_chord_positions = []
+        for potential_chord_position in potential_complete_chord_positions:
+            distance = 0
+            for i in range(1, len(potential_chord_position)-1):
+                distance += abs(potential_chord_position[i-1][2] - potential_chord_position[i][2])
+            #print(distance, potential_chord_position)
+            weighted_chord_positions.append((distance,potential_chord_position))
+        weighted_chord_positions = sorted(weighted_chord_positions, key=lambda x: x[0])
+        #print(weighted_chord_positions)
+        return weighted_chord_positions
+
+    def colour_chord(self, chord_positions):
+        white_pen = QPen(Qt.white)
+        gray_pen = QPen(Qt.gray)
+        trans_pen = QPen(Qt.transparent)
+
+        #print(chord_positions[chordIndex])
+
+        for (string, note, fret, note_marker, note_label) in chord_positions[self.chordIndex][1]:
+            note_marker.setBrush(Qt.white)
+            note_marker.setPen(trans_pen)
+            note_label.setBrush(Qt.black)
+
+
 
 # -----------------------------------------------------------------------------
 
@@ -1515,15 +1544,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     @Slot(int)
     def rotate_notes(self, rotation, scale):
-        #self.chordBeforeChange = self.chords_combobox.currentText()
         scale = sorted([(inScale +(12-scale[rotation]))%12 for inScale in scale])
-        #self.draw_scale()
-        #self.draw_notes_on_neck()
-        '''
-        for index in range(self.chords_combobox.count()):
-            if self.chordBeforeChange == self.chords_combobox.itemText(index):
-                self.chords_combobox.setCurrentIndex(index)
-        '''
         return scale
 
     @Slot(int)
@@ -1551,11 +1572,30 @@ class CircleAndNeckVBoxFrame(QFrame):
     def show_chord(self):
         self.color_notes_by_default()
         if self.chords_combobox.currentText() != "":
+            if len(self.chord_positions) > 1:
+                self.alt_chords.setEnabled(True)
             self.color_chord_notes(self.chords_combobox.currentData())
+        else:
+            self.alt_chords.setEnabled(False)
+            self.chordIndex = 0
+
+    @Slot()
+    def show_alternate_chord(self):
+        self.color_notes_by_default()
+        print("chordIndex: %s" % self.chordIndex)
+        print("len(self.chord_positions): %s" % len(self.chord_positions))
+
+        self.chordIndex = (self.chordIndex+1)%len(self.chord_positions)
+        print("chordIndex: %s" % self.chordIndex)
+
+        self.color_chord_notes(self.chords_combobox.currentData())
 
     @Slot(int)
     def show_highlighted_chord(self, index):
         self.color_notes_by_default()
+        if len(self.chord_positions) > 1:
+            self.alt_chords.setEnabled(True)
+        self.chordIndex = 0
         self.color_chord_notes(self.chords_combobox.itemData(index))
 
 
@@ -1599,7 +1639,6 @@ class MainWindow(QMainWindow):
         self.set_mode("I - Ionian (major)", 0)
         self.set_arrangement("I", 0)
         self.set_tuning("Standard 6 \tEADGBE")
-        self.update()
 
 # -----------------------------------------------------------------------------
 
@@ -1687,16 +1726,9 @@ class MainWindow(QMainWindow):
         parentLayout.addLayout(vBoxLayout)
 
     def create_full_neck_radioButton(self, parentLayout):
-        #scaleLabel = QLabel("Full Neck:")
-        #scaleLabel.setAlignment(Qt.AlignLeft)
-        #scaleLabel.setFont(self.labelFont)
         self.full_neck_radioButton = QRadioButton("Neck window")
         self.full_neck_radioButton.toggled.connect(self.toggle_neck_general_view)
         parentLayout.addWidget(self.full_neck_radioButton)
-        #chordVBoxLayout = QVBoxLayout()
-        #chordVBoxLayout.addWidget(scaleLabel)
-        #chordVBoxLayout.addWidget(self.full_neck_radioButton)
-        #parentLayout.addLayout(chordVBoxLayout)
 
 # -----------------------------------------------------------------------------
 
@@ -1741,7 +1773,6 @@ class MainWindow(QMainWindow):
         '''
         self.scaleName = scale_name
         self.scale = scales[self.scaleName]
-        #if len(self.scale) != self.scaleLength:
         self.scaleLength = len(self.scale)
         self.add_compatible_modes_in_Combobox()
         self.scaleLength = len(self.scale)
@@ -1792,7 +1823,6 @@ class MainWindow(QMainWindow):
         self.degreesFrames = list()
 
     def addDegreeFrame(self, visible=False, name=""):
-        #print("\nIn addDegreeFrame...")
         vBoxFrame = CircleAndNeckVBoxFrame(self, 1, visible=visible, name=name)
         self.degreesFrames.append(vBoxFrame)
         vBoxFrame.setFixedSize(483, 854)
@@ -1824,9 +1854,7 @@ class MainWindow(QMainWindow):
         self.neckGeneralView.refresh()
 
     def refresh(self):
-        #print("\nIn mainWindow refresh")
         for vFrame in self.degreesFrames:
-            #print("In mainWindow refresh, passing refresh to %s" % vFrame.name)
             vFrame.refresh()
         if not self.neckGeneralView == '':
             self.neckGeneralView.refresh()
