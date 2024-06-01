@@ -11,9 +11,8 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QGraphicsView, QGraphic
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsItemGroup, QGraphicsEllipseItem, QGraphicsSimpleTextItem, QGraphicsLineItem
 from PySide6.QtWidgets import QDialog, QPushButton, QCheckBox, QRadioButton, QComboBox, QSlider, QMenu, QLabel, QGridLayout, QVBoxLayout, QHBoxLayout, QWidget, QFrame, QGraphicsBlurEffect
 from PySide6.QtCore import Qt, QPointF, QRectF, QLineF, QSizeF, Slot
-from PySide6.QtGui import QPolygonF, QPen, QBrush, QPainter, QAction, QFont, QColor
-import math
-import itertools
+from PySide6.QtGui import QPolygonF, QPen, QBrush, QPainter, QAction, QFont, QColor, QFontMetrics
+import sys, math, itertools
 
 from scale_circle_library import fretZeroNoteItem, NoteItem, TriangleNoteItem, linkModesToScales
 from catalogs import notes, scales, modes, alterations, tunings, stringSets, stringGaugeFromNumberOfString, chords, enrichments, semitonesToConsiderByNumberOfStrings, degrees, degreeArrangements
@@ -22,7 +21,7 @@ from Inlays import NoBorderEllipseItem, inlays, sideInlays, customColours
 # -----------------------------------------------------------------------------
 
 SCALE_CIRCLE_RADIUS = 160
-FRET_SPACING = 45
+FRET_SPACING = 50
 FRET_OVERSHOOT = 4
 STRING_SPACING = 30
 
@@ -34,15 +33,18 @@ NECK_WIDENING = 5
 FONT = 'Garamond Premier Pro'
 DEGREE_COLOUR = 'Destorm'
 
+ZOOM = 1.0
+
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
 class NeckWindow(QDialog):
-    def __init__(self, mainWindowInstance):
+    def __init__(self, mainWindowInstance, scale_factor=1.0):
         super().__init__()
         self.setWindowTitle("🎸 Neck general view")
         self.mainWindowInstance = mainWindowInstance
+        self.scale_factor = scale_factor
 
         self.once = True
         self.neckSceneRect = ''
@@ -69,7 +71,7 @@ class NeckWindow(QDialog):
         self.fanHeight = 1000000
 
         self.labelFont = QFont()
-        self.labelFont.setPointSize(20)
+        self.labelFont.setPointSize(20*self.scale_factor)
         self.labelFont.setFamily(FONT)
 
         self.create_gui()
@@ -91,15 +93,7 @@ class NeckWindow(QDialog):
         self.topHBoxLayout = QHBoxLayout()
         self.mainVBoxLayout.addLayout(self.topHBoxLayout)
 
-        self.neck_graphics_view = QGraphicsView()
-        self.neck_graphics_view.setRenderHint(QPainter.Antialiasing)
-        self.neck_graphics_view.viewport().setAutoFillBackground(True)
-        palette = self.neck_graphics_view.viewport().palette()
-        palette.setColor(self.neck_graphics_view.viewport().backgroundRole(), Qt.lightGray)
-        self.neck_graphics_view.viewport().setPalette(palette)
-
-        self.neck_scene = QGraphicsScene()
-        self.neck_graphics_view.setScene(self.neck_scene)
+        self.create_neck_graphic_view()
 
         self.create_option_buttons()
         self.create_root_note_combobox()
@@ -112,28 +106,37 @@ class NeckWindow(QDialog):
     def create_option_buttons(self):
         '''
         '''
+        padding = 15
         self.show_root_checkbox = QCheckBox("Show roots")
         self.show_root_checkbox.setChecked(True)
-        self.show_root_checkbox.toggled.connect(self.draw_fanned_neck)
+        self.show_root_checkbox.toggled.connect(self.draw_neck)
+
+        self.show_tuning_checkbox = QCheckBox("Show tuning")
+        self.show_tuning_checkbox.setChecked(False)
+        self.show_tuning_checkbox.toggled.connect(self.draw_neck)
+
         self.fan_frets_checkbox = QCheckBox("Fanned frets")
         self.fan_frets_checkbox.setChecked(False)
-        self.fan_frets_checkbox.toggled.connect(self.draw_fanned_neck)
-        self.tuning_checkbox = QCheckBox("Tuning")
-        self.tuning_checkbox.setChecked(False)
-        self.tuning_checkbox.toggled.connect(self.draw_fanned_neck)
+        self.fan_frets_checkbox.toggled.connect(self.draw_neck)
+
+        self.reg_frets_checkbox = QCheckBox("regular frets")
+        self.reg_frets_checkbox.setChecked(True)
+        self.reg_frets_checkbox.toggled.connect(self.draw_neck)
+
         vBoxLayout = QVBoxLayout()
+        vBoxLayout.addWidget(self.show_tuning_checkbox)
         vBoxLayout.addWidget(self.show_root_checkbox)
         vBoxLayout.addWidget(self.fan_frets_checkbox)
-        vBoxLayout.addWidget(self.tuning_checkbox)
+        vBoxLayout.addWidget(self.reg_frets_checkbox)
         self.topHBoxLayout.addLayout(vBoxLayout)
 
         self.fan_apex_slider = QSlider(Qt.Horizontal)
         self.fan_apex_slider.setMinimum(0)
-        self.fan_apex_slider.setMaximum(FRET_SPACING   * (self.num_frets + 1))
-        self.fan_apex_slider.setValue(FRET_SPACING * 1)
-        self.fan_apex_slider.setGeometry(-15, -2*STRING_SPACING, FRET_SPACING*(self.num_frets)+30, STRING_SPACING)
-        self.fan_apex_slider.setStyleSheet("background: transparent;\nhandle: { width: 5px; height: 5px; margin: -3px 0;}")
-        self.fan_apex_slider.valueChanged.connect(self.draw_fanned_neck)
+        self.fan_apex_slider.setMaximum(FRET_SPACING   * (self.num_frets + 1) *self.scale_factor)
+        self.fan_apex_slider.setValue(FRET_SPACING * self.scale_factor)
+        self.fan_apex_slider.setGeometry(-padding*self.scale_factor, -2*STRING_SPACING*self.scale_factor, (FRET_SPACING*(self.num_frets)+(2*padding))*self.scale_factor, STRING_SPACING*self.scale_factor)
+        self.fan_apex_slider.setStyleSheet("background: transparent;\nhandle: { width: %spx; height: %spx; margin: -%spx 0;}"%(5*self.scale_factor, 5**self.scale_factor, 3*self.scale_factor))
+        self.fan_apex_slider.valueChanged.connect(self.draw_neck)
         self.fan_apex_slider.hide()
         self.neck_scene.addWidget(self.fan_apex_slider)
 
@@ -159,7 +162,7 @@ class NeckWindow(QDialog):
         self.inlays_combobox = QComboBox()
         self.inlays_combobox.addItems(inlays.keys())
         self.inlays_combobox.setCurrentText(".strandberg＊")
-        self.inlays_combobox.currentTextChanged.connect(lambda: self.draw_fanned_neck())
+        self.inlays_combobox.currentTextChanged.connect(lambda: self.draw_neck())
         self.inlays_combobox.highlighted.connect(self.show_highlighted_inlays)
         vBoxLayout = QVBoxLayout()
         vBoxLayout.addWidget(label)
@@ -178,6 +181,17 @@ class NeckWindow(QDialog):
         vBoxLayout.addWidget(label)
         vBoxLayout.addWidget(self.degrees_colours_combobox)
         self.topHBoxLayout.addLayout(vBoxLayout)
+
+    def create_neck_graphic_view(self):
+        self.neck_graphics_view = QGraphicsView()
+        self.neck_graphics_view.setRenderHint(QPainter.Antialiasing)
+        self.neck_graphics_view.viewport().setAutoFillBackground(True)
+        palette = self.neck_graphics_view.viewport().palette()
+        palette.setColor(self.neck_graphics_view.viewport().backgroundRole(), Qt.lightGray)
+        self.neck_graphics_view.viewport().setPalette(palette)
+
+        self.neck_scene = QGraphicsScene()
+        self.neck_graphics_view.setScene(self.neck_scene)
 
     def create_graphic_item_groups(self):
         # Groups to help manage graphic items
@@ -203,7 +217,7 @@ class NeckWindow(QDialog):
         self.modeIndex = self.modeIndex%self.scaleLength
         self.set_modeScale()
 
-        self.draw_fanned_neck()
+        self.draw_neck()
         self.label_degrees_on_neck()
 
     def set_mode(self, modeIndex):
@@ -211,7 +225,7 @@ class NeckWindow(QDialog):
 
         self.set_modeScale()
 
-        self.draw_fanned_neck()
+        self.draw_neck()
         self.label_degrees_on_neck()
 
     def set_modeScale(self):
@@ -257,7 +271,7 @@ class NeckWindow(QDialog):
         self.first_root_position = (rootNoteValue - firstTuningNoteValue)-1
         self.mainWindowInstance.refresh()
 
-        self.draw_fanned_neck()
+        self.draw_neck()
         self.label_degrees_on_neck()
 
     def set_degrees_colour(self):
@@ -281,21 +295,21 @@ class NeckWindow(QDialog):
         side.
         Base can be modified with a QSlider
         '''
-        halfNeckHeight = (STRING_SPACING * (self.num_strings - 1))/2
-        return x - (self.fanBase-x)*(y-halfNeckHeight)/self.fanHeight
+        halfNeckHeight = ((STRING_SPACING * (self.num_strings - 1))/2)*self.scale_factor
+        return x - (self.fanBase*self.scale_factor-x)*(y-halfNeckHeight)/(self.fanHeight*self.scale_factor)
 
-    def draw_fanned_neck(self, inlaysType=False):
+    def draw_neck(self, inlaysType=False):
         '''
         General function called when the QSlider value changes.
         '''
         if self.fan_frets_checkbox.isChecked():
             self.fanBase   = self.fan_apex_slider.value()
-            self.fanHeight = (60 - (self.num_strings-6)*20) * (STRING_SPACING * (self.num_strings - 1))
+            self.fanHeight = (60 - (self.num_strings-6)*20) * (STRING_SPACING * (self.num_strings - 1) * self.scale_factor)
             self.fan_apex_slider.show()
             self.inlays_combobox.setCurrentText(".strandberg＊")
         else:
             self.fanBase   = 0
-            self.fanHeight = 1000000
+            self.fanHeight = 1000000*self.scale_factor
             self.fan_apex_slider.hide()
         self.draw_notes_on_neck(inlaysType=inlaysType)
         self.set_degrees_colour()
@@ -322,7 +336,7 @@ class NeckWindow(QDialog):
         # Draw strings
         self.draw_strings()
 
-        if self.tuning_checkbox.isChecked():
+        if self.show_tuning_checkbox.isChecked():
             self.draw_tuning()
 
         if self.neck_diagram_inlays_group not in self.neck_scene.items():
@@ -333,22 +347,22 @@ class NeckWindow(QDialog):
             self.neck_scene.addItem(self.neck_diagram_background_group)
 
     def draw_neck_borders(self):
-        neck_width  = FRET_SPACING   * (self.num_frets + 1)
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_width  = FRET_SPACING   * (self.num_frets + 1)*self.scale_factor
+        neck_height = STRING_SPACING * (self.num_strings - 1)*self.scale_factor
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
-        highStringThicknessAllowance = strings_thickness[0]/20
-        lowStringThicknessAllowance = strings_thickness[-1]/20
+        highStringThicknessAllowance = (strings_thickness[0]/20)*self.scale_factor
+        lowStringThicknessAllowance = (strings_thickness[-1]/20)*self.scale_factor
 
         darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
-        darkGray_pen.setWidth(0.5)
+        darkGray_pen.setWidth(0.5*self.scale_factor)
 
         #Draw borders of neck
-        fretOvershoot = FRET_OVERSHOOT+1
+        fretOvershoot = (FRET_OVERSHOOT+1)*self.scale_factor
         # coords of begin and end of top neck border
-        xBegin = -15
+        xBegin = -15*self.scale_factor
         yBegin = -fretOvershoot-highStringThicknessAllowance
         xEnd = neck_width
-        yEnd = -fretOvershoot-NECK_WIDENING-highStringThicknessAllowance
+        yEnd = -fretOvershoot-NECK_WIDENING*self.scale_factor-highStringThicknessAllowance
         # correction for fanning at the nut
         xBegin = self.transFan(xBegin, yBegin)
 
@@ -357,10 +371,10 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group.addToGroup(top)
 
         # coords of begin and end of bottom neck border
-        xBegin = -15
+        xBegin = -15*self.scale_factor
         yBegin = neck_height+fretOvershoot+lowStringThicknessAllowance
         xEnd = neck_width
-        yEnd = neck_height+fretOvershoot+NECK_WIDENING+lowStringThicknessAllowance
+        yEnd = neck_height+fretOvershoot+NECK_WIDENING*self.scale_factor+lowStringThicknessAllowance
         # correction for fanning at the nut
         xBegin = self.transFan(xBegin, yBegin)
 
@@ -369,17 +383,18 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group.addToGroup(bottom)
 
     def draw_frets(self):
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_height = (STRING_SPACING * (self.num_strings - 1))*self.scale_factor
+        neck_length = FRET_SPACING * (self.num_frets + 1)*self.scale_factor
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
-        highStringThicknessAllowance = strings_thickness[0]/20
-        lowStringThicknessAllowance = strings_thickness[-1]/20
+        highStringThicknessAllowance = (strings_thickness[0]/20)*self.scale_factor
+        lowStringThicknessAllowance = (strings_thickness[-1]/20)*self.scale_factor
 
         # Draw fret 0
         fret_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
-        fret_darkGray_pen.setWidth(4)      # Set the pen width
+        fret_darkGray_pen.setWidth(4*self.scale_factor)      # Set the pen width
         x = 0
-        top  = -FRET_OVERSHOOT-highStringThicknessAllowance
-        bottom = neck_height+FRET_OVERSHOOT+lowStringThicknessAllowance
+        top  = -FRET_OVERSHOOT*self.scale_factor-highStringThicknessAllowance
+        bottom = neck_height+FRET_OVERSHOOT*self.scale_factor+lowStringThicknessAllowance
         xTop = self.transFan(x, top)
         xBottom = self.transFan(x, bottom)
         line = QGraphicsLineItem(xTop, top, xBottom, bottom)
@@ -387,10 +402,10 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group.addToGroup(line)
 
         # draw nut
-        fret_darkGray_pen.setWidth(10)      # Set the pen width
-        x = -15
-        top = -FRET_OVERSHOOT+4-highStringThicknessAllowance
-        bottom = neck_height+FRET_OVERSHOOT-4+lowStringThicknessAllowance
+        fret_darkGray_pen.setWidth(10*self.scale_factor)      # Set the pen width
+        x = -15*self.scale_factor
+        top = (-FRET_OVERSHOOT+4)*self.scale_factor-highStringThicknessAllowance
+        bottom = neck_height+(FRET_OVERSHOOT-4)*self.scale_factor+lowStringThicknessAllowance
         xTop = self.transFan(x, top)
         xBottom = self.transFan(x, bottom)
         line = QGraphicsLineItem(xTop, top, xBottom, bottom)
@@ -398,12 +413,19 @@ class NeckWindow(QDialog):
         self.neck_diagram_background_group.addToGroup(line)
 
         # Draw frets
-        fret_darkGray_pen.setWidth(3)      # Set the pen width
-        for i in range(1, self.num_frets + 1):
-            x = i * FRET_SPACING
-            widthAdjustment = NECK_WIDENING*(i/(self.num_frets + 1))
-            top    = -(FRET_OVERSHOOT + widthAdjustment + highStringThicknessAllowance)
-            bottom = neck_height+(FRET_OVERSHOOT + widthAdjustment + lowStringThicknessAllowance)
+        fret_darkGray_pen.setWidth(3*self.scale_factor)      # Set the pen width
+        for i in range(0, self.num_frets + 1):
+            if self.reg_frets_checkbox.isChecked():
+                x = i * FRET_SPACING * self.scale_factor
+            else:
+                x = 4/3*neck_length - (4/3*neck_length / (2**(i/12)))
+
+            widthAdjustment = NECK_WIDENING*(i/(self.num_frets + 1))*self.scale_factor
+            top    = -(FRET_OVERSHOOT*self.scale_factor + widthAdjustment + highStringThicknessAllowance)
+            # visual debug
+            if i%12 == 0:
+                top = top -20
+            bottom = neck_height+(FRET_OVERSHOOT*self.scale_factor + widthAdjustment + lowStringThicknessAllowance)
             xTop = self.transFan(x, top)
             xBottom = self.transFan(x, bottom)
             line = QGraphicsLineItem(xTop, top, xBottom, bottom)
@@ -411,27 +433,36 @@ class NeckWindow(QDialog):
             self.neck_diagram_background_group.addToGroup(line)
 
     def draw_inlays(self, type="black_dot"):
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        stringNumbersAdjustmentRatio = self.num_strings/6.0
+        neck_height = STRING_SPACING * (self.num_strings - 1)*self.scale_factor
+        neck_length = FRET_SPACING * (self.num_frets + 1)*self.scale_factor
         halfNeckHeight = neck_height/2
 
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
-        highStringThicknessAllowance = strings_thickness[0]/20
-        lowStringThicknessAllowance = strings_thickness[-1]/20
+        highStringThicknessAllowance = (strings_thickness[0]/20)*self.scale_factor
+        lowStringThicknessAllowance = (strings_thickness[-1]/20)*self.scale_factor
 
         for i in range(0, self.num_frets):
-            adjustmentForFret = NECK_WIDENING*i/self.num_frets
+            adjustmentForFret = (NECK_WIDENING*i/self.num_frets)*self.scale_factor
             # Neck Inlays
             if i in inlays[type].keys():
                 for inlayMark in inlays[type][i]:
-                    x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
+                    if self.reg_frets_checkbox.isChecked():
+                        x = ((FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING)*self.scale_factor
+                    else:
+                        x = 4/3*neck_length - (4/3*neck_length / (2**(i/12)))
+                        nextX = 4/3*neck_length - (4/3*neck_length / (2**((1+i)/12)))
+                        thisFretSpacing = nextX - x
+                        x = (x + ((thisFretSpacing*inlayMark['delta_x']))) * self.scale_factor
+
                     if inlayMark['delta_y'] < 0:
                         adjustmentForFret = -adjustmentForFret
                     elif inlayMark['delta_y'] == 0:
                         adjustmentForFret = 0
-                    y = halfNeckHeight + halfNeckHeight*inlayMark['delta_y'] + adjustmentForFret
+                    y = halfNeckHeight + halfNeckHeight*inlayMark['delta_y']*stringNumbersAdjustmentRatio + adjustmentForFret
                     newX = self.transFan(x, y)
                     point = QPointF(newX, y)
-                    inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
+                    inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2*self.scale_factor, inlayMark['size_y']/2*self.scale_factor), QSizeF(inlayMark['size_x']*self.scale_factor, inlayMark['size_y']*self.scale_factor)))
                     inlay.setBrush(inlayMark['color'])
                     if 'pen' in inlayMark.keys():
                         inlay.setPen(inlayMark['pen'])
@@ -439,26 +470,33 @@ class NeckWindow(QDialog):
             # Side inlays
             if i in sideInlays[type].keys():
                 for inlayMark in sideInlays[type][i]:
-                    x = (FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING
+                    if self.reg_frets_checkbox.isChecked():
+                        x = ((FRET_SPACING*inlayMark['delta_x']) + i * FRET_SPACING)*self.scale_factor
+                    else:
+                        x = 4/3*neck_length - (4/3*neck_length / (2**(i/12)))
+                        nextX = 4/3*neck_length - (4/3*neck_length / (2**((1+i)/12)))
+                        thisFretSpacing = nextX - x
+                        x = (x + ((thisFretSpacing*inlayMark['delta_x']))) * self.scale_factor
+
                     y = halfNeckHeight + halfNeckHeight*inlayMark['delta_y'] + abs(adjustmentForFret) + lowStringThicknessAllowance
                     newX = self.transFan(x, y)
                     point = QPointF(newX, y)
-                    inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2, inlayMark['size_y']/2), QSizeF(inlayMark['size_x'], inlayMark['size_y'])))
+                    inlay = inlayMark['type'](QRectF(point - QPointF(inlayMark['size_x']/2*self.scale_factor, inlayMark['size_y']/2*self.scale_factor), QSizeF(inlayMark['size_x']*self.scale_factor, inlayMark['size_y']*self.scale_factor)))
                     inlay.setBrush(inlayMark['color'])
                     if 'pen' in inlayMark.keys():
                         inlay.setPen(inlayMark['pen'])
                     self.neck_diagram_inlays_group.addToGroup(inlay)
 
     def draw_strings(self):
-        neck_width  = FRET_SPACING   * (self.num_frets + 1)
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_width  = FRET_SPACING   * (self.num_frets + 1)*self.scale_factor
+        neck_height = STRING_SPACING * (self.num_strings - 1)*self.scale_factor
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
         string_darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
 
         # Draw strings
         for i in range(self.num_strings):
-            xBegin = -15
-            yBegin = i * STRING_SPACING
+            xBegin = -15*self.scale_factor
+            yBegin = i * STRING_SPACING * self.scale_factor
             widthAdjustmentProportion = (yBegin-(neck_height/2))/(neck_height/2)
             xEnd = neck_width
             yEnd = yBegin+(widthAdjustmentProportion*NECK_WIDENING)
@@ -466,7 +504,7 @@ class NeckWindow(QDialog):
             xBegin = self.transFan(xBegin, yBegin)
 
             line = QGraphicsLineItem(xBegin, yBegin, xEnd, yEnd)
-            string_darkGray_pen.setWidth(strings_thickness[i]/10.0)
+            string_darkGray_pen.setWidth((strings_thickness[i]/10.0)*self.scale_factor)
             line.setPen(string_darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
@@ -479,8 +517,9 @@ class NeckWindow(QDialog):
         if not isinstance(inlaysType, str):
             inlaysType = self.inlays_combobox.currentText()
 
-        neck_width  = FRET_SPACING   * (self.num_frets + 1)
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_width  = FRET_SPACING   * (self.num_frets + 1)*self.scale_factor
+        neck_height = STRING_SPACING * (self.num_strings - 1)*self.scale_factor
+
 
         self.draw_neck_background(inlaysType=inlaysType)
 
@@ -490,21 +529,28 @@ class NeckWindow(QDialog):
 
         adjustmentForString = 0.0
         adjustmentForFret = 0.0
-        noteRadius = STRING_SPACING / 2.0
+        noteRadius = (STRING_SPACING / 2.0) *self.scale_factor
         halfNeckHeight = neck_height/2
 
-        zeroFretNoteXadjustment = 13
+        zeroFretNoteXadjustment = 13*self.scale_factor
 
-        base   = FRET_SPACING * 1
+        base   = FRET_SPACING * self.scale_factor
         height = neck_height * 20
 
         # from low to high strings
         for i in range(self.num_strings):
-            y = neck_height - (i * STRING_SPACING)
+            y = neck_height - (i * STRING_SPACING*self.scale_factor)
             adjustmentForString = (y-halfNeckHeight)/halfNeckHeight #(for a 6 strings: -1, -0.6, -0.2, 0.2, 0.6, 1)
             # from low to high frets
             for j in range(-1, self.num_frets):
-                x = (j * FRET_SPACING) + (FRET_SPACING / 2.0)
+                if self.reg_frets_checkbox.isChecked():
+                    x = (j * FRET_SPACING*self.scale_factor) + (FRET_SPACING*self.scale_factor / 2.0)
+                else:
+                    x = 4/3*neck_width - (4/3*neck_width / (2**(j/12)))
+                    nextX = 4/3*neck_width - (4/3*neck_width / (2**((1+j)/12)))
+                    thisFretSpacing = nextX - x
+                    x = x + ((thisFretSpacing / 2.0))
+
                 adjustmentForFret = (j+.5)/(self.num_frets) #(should go 0 to 1)
                 semitone_text = (self.currentTuning[i] + j) - self.first_root_position
                 if semitone_text % 12 in self.modeScale:
@@ -517,8 +563,8 @@ class NeckWindow(QDialog):
                     point = QPointF(newX, newY)
                     if j == -1:
                         # Notes generated by fret 0, shown as rectangles just below fret 0
-                        yTop = newY - STRING_SPACING/2
-                        yBot = newY + STRING_SPACING/2
+                        yTop = newY - STRING_SPACING*self.scale_factor/2
+                        yBot = newY + STRING_SPACING*self.scale_factor/2
                         xLeft = x + zeroFretNoteXadjustment
                         xRight = x + zeroFretNoteXadjustment + noteRadius/2
                         xTopLeft = self.transFan(xLeft, yTop)
@@ -536,14 +582,14 @@ class NeckWindow(QDialog):
                         # Root Notes potentially shown as triangles
                         triangle = QPolygonF()
                         triangle.append(QPointF(noteRadius, 0))  # Top point
-                        triangle.append(QPointF(STRING_SPACING, STRING_SPACING))  # Bottom right point
-                        triangle.append(QPointF(0, STRING_SPACING))  # Bottom left point
+                        triangle.append(QPointF(STRING_SPACING*self.scale_factor, STRING_SPACING*self.scale_factor))  # Bottom right point
+                        triangle.append(QPointF(0, STRING_SPACING*self.scale_factor))  # Bottom left point
                         note_point = TriangleNoteItem(triangle, embeddingWidget=self)
                         note_point.setPos(newX - noteRadius, newY - noteRadius)
 
                     else:
                         # playable Notes shown as cercles
-                        note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
+                        note_point = NoteItem(QRectF(point - QPointF(noteRadius, noteRadius), QSizeF(STRING_SPACING*self.scale_factor, STRING_SPACING*self.scale_factor)), embeddingWidget=self)
 
                     note_point.note = semitone_text%12
                     note_point.setPen(QPen(Qt.transparent))
@@ -563,15 +609,15 @@ class NeckWindow(QDialog):
         '''
         setting the usual values and fonts
         '''
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_height = STRING_SPACING*self.scale_factor * (self.num_strings - 1)
         halfNeckHeight = neck_height/2
-        noteRadius = STRING_SPACING / 2.0
+        noteRadius = STRING_SPACING*self.scale_factor / 2.0
         notesByIndex = {value: key for key, value in notes.items()}
-        tuningXPosition = (-2 * FRET_SPACING) + (FRET_SPACING / 2.0)
+        tuningXPosition = (-2 * FRET_SPACING*self.scale_factor) + (FRET_SPACING*self.scale_factor / 2.0)
 
         font = QFont()
         font.setFamily(FONT)
-        font.setPointSize(.8*(STRING_SPACING))
+        font.setPointSize(.8*(STRING_SPACING*self.scale_factor))
         brush = QBrush(Qt.white, bs=Qt.SolidPattern)
 
         self.clear_group(self.neck_diagram_tuning_group)
@@ -582,7 +628,7 @@ class NeckWindow(QDialog):
         for i in range(self.num_strings):
             # from low to high frets
             x = tuningXPosition
-            y = neck_height - (i * STRING_SPACING)
+            y = neck_height - (i * STRING_SPACING*self.scale_factor)
             adjustmentForString = (y-halfNeckHeight)/halfNeckHeight #(for a 6 strings: -1, -0.6, -0.2, 0.2, 0.6, 1)
             adjustmentForFret = (-.5)/(self.num_frets) #(should go 0 to 1)
             adjustment = adjustmentForString * adjustmentForFret
@@ -607,7 +653,8 @@ class NeckWindow(QDialog):
             self.neck_diagram_tuning_group.addToGroup(text_item)
 
     def label_degrees_on_neck(self):
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_width  = FRET_SPACING   * (self.num_frets + 1)*self.scale_factor
+        neck_height = STRING_SPACING*self.scale_factor * (self.num_strings - 1)
 
         self.identifiedDegrees = {each: list() for each in range(12)}
         self.clear_group(self.neck_diagram_degrees_group)
@@ -615,23 +662,42 @@ class NeckWindow(QDialog):
 
         font = QFont()
         font.setFamily(FONT)
-        font.setPointSize(.95*(STRING_SPACING))
+        font.setPointSize(.95*(STRING_SPACING*self.scale_factor))
 
         brush = QBrush(Qt.white, bs=Qt.SolidPattern)
 
         # Label for used Degrees in arrangement
         for j in range(-1, self.num_frets):
-            x = (FRET_SPACING/2.0) + j * FRET_SPACING
-            y = neck_height + 2.1 * STRING_SPACING
+            if self.reg_frets_checkbox.isChecked():
+                x = (FRET_SPACING*self.scale_factor/2.0) + j * FRET_SPACING*self.scale_factor
+            else:
+                x = 4/3*neck_width - (4/3*neck_width / (2**(j/12)))
+                nextX = 4/3*neck_width - (4/3*neck_width / (2**((1+j)/12)))
+                thisFretSpacing = nextX - x
+                x = x + ((thisFretSpacing / 2.0))
 
-            yTop = y - STRING_SPACING/2
-            yBot = y + STRING_SPACING/2
-            xLeft = x-FRET_SPACING/2
-            xRight = x+FRET_SPACING/2
+            y = neck_height + 2.1 * STRING_SPACING*self.scale_factor
+
+            yTop = y - STRING_SPACING/2*self.scale_factor
+            yBot = y + STRING_SPACING/2*self.scale_factor
+            xLeft = x-FRET_SPACING/2*self.scale_factor
+            xRight = x+FRET_SPACING/2*self.scale_factor
+
+            if not self.reg_frets_checkbox.isChecked():
+                if j==-1:
+                    xLeft = x
+                else:
+                    xLeft = x - thisFretSpacing/2.0
+                print('xleft: %s'%xLeft)
+                xRight = x+thisFretSpacing/2.0
+
             xTopLeft = self.transFan(xLeft, yTop)
             xTopRight = self.transFan(xRight, yTop)
             xBotLeft = self.transFan(xLeft, yBot)
             xBotRight = self.transFan(xRight, yBot)
+            # better position first label in-f any
+            if not self.reg_frets_checkbox.isChecked() and j==-1:
+                x = xLeft + (xRight - xLeft)/2.0
             xLabel = self.transFan(x, y)
 
             rectangle = QPolygonF()
@@ -656,6 +722,7 @@ class NeckWindow(QDialog):
             colorect.note = semitone%12
             self.identifiedNotes[semitone%12].append([colorect, semitone, -1, j])
             if (semitone%12 in self.modeScale) and (self.first_root_position <= j <= self.num_frets - self.first_root_position):
+                #print("j: %s"%j)
                 point = QPointF(xLabel, y+3)
 
                 # Creation of label object for the note
@@ -750,7 +817,7 @@ class NeckWindow(QDialog):
         # Get the bounding rectangle of all items in the scene
         rect = self.neck_scene.itemsBoundingRect()
         # Calculate the center point of the bounding rectangle
-        self.setFixedSize(self.width(), 480 + (self.num_strings-6)*STRING_SPACING)
+        self.setFixedSize(self.width(), (480 + (self.num_strings-6)*STRING_SPACING)*self.scale_factor)
         center = rect.center()
         # Get the size of the viewport
         view_size = self.neck_graphics_view.viewport().size()
@@ -760,7 +827,18 @@ class NeckWindow(QDialog):
         self.neck_scene.setSceneRect(scene_pos.x(), scene_pos.y(), view_size.width(), view_size.height())
         self.neck_graphics_view.viewport().update()
 
-    def refresh(self):
+    def keyPressEvent(self, event):
+        self.mainWindowInstance.keyPressEvent(event)
+
+    def refresh(self, scale_factor=1.0):
+        self.scale_factor = scale_factor
+        padding = 15
+        self.fan_apex_slider.setGeometry(-padding*self.scale_factor, -2*STRING_SPACING*self.scale_factor, (FRET_SPACING*(self.num_frets)+(2*padding))*self.scale_factor, STRING_SPACING*self.scale_factor)
+        self.fan_apex_slider.setStyleSheet("background: transparent;\nhandle: { width: %spx; height: %spx; margin: -%spx 0;}"%(5*self.scale_factor, 5**self.scale_factor, 3*self.scale_factor))
+
+        self.draw_neck()
+        self.mainVBoxLayout.update()
+        self.update()
         self.center_neck_view()
 
     def closeEvent(self, event):
@@ -773,7 +851,7 @@ class NeckWindow(QDialog):
 
     @Slot(int)
     def show_highlighted_inlays(self, index):
-        self.draw_fanned_neck(inlaysType=self.inlays_combobox.itemText(index))
+        self.draw_neck(inlaysType=self.inlays_combobox.itemText(index))
 
 
 
@@ -785,12 +863,13 @@ class NeckWindow(QDialog):
 # -----------------------------------------------------------------------------
 
 class CircleAndNeckVBoxFrame(QFrame):
-    def __init__(self, topApp, degree=1, visible=False, name="frame0"):
+    def __init__(self, topApp, degree=1, visible=False, name="frame0", scale_factor=1.0):
         super().__init__()
 
         # The app in which this widget lives (and must have access to its parameters)
         self.topApp = topApp
         self.name = name
+        self.scale_factor = scale_factor
 
         self.once = True
         self.minimumNumberLowerStringsNumber = 4
@@ -846,7 +925,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         # Add first circle_graphics_view to layout
         self.circle_graphics_view = QGraphicsView()
-        self.circle_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH, GRAPHICSVIEW_HEIGHT)
+        self.circle_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH*self.scale_factor, GRAPHICSVIEW_HEIGHT*self.scale_factor)
         self.circle_graphics_view.viewport().setAutoFillBackground(True)
         palette = self.circle_graphics_view.viewport().palette()
         palette.setColor(self.circle_graphics_view.viewport().backgroundRole(), Qt.lightGray)
@@ -864,7 +943,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         # Add last neck_graphics_view to layout
         self.neck_graphics_view = QGraphicsView()
-        self.neck_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH, GRAPHICSVIEW_HEIGHT)
+        self.neck_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH*self.scale_factor, GRAPHICSVIEW_HEIGHT*self.scale_factor)
         self.neck_graphics_view.viewport().setAutoFillBackground(True)
         palette = self.neck_graphics_view.viewport().palette()
         palette.setColor(self.neck_graphics_view.viewport().backgroundRole(), Qt.lightGray)
@@ -878,7 +957,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         # Add Scale label to the layout
         ModeNamefont = QFont()
-        ModeNamefont.setPointSize(24)
+        ModeNamefont.setPointSize(24*self.scale_factor)
         ModeNamefont.setFamily(FONT)
         self.labelModeName = QLabel("This is a label")
         self.labelModeName.setAlignment(Qt.AlignCenter)
@@ -886,7 +965,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         # Add Scale label to the layout
         modeContentfont = QFont()
-        modeContentfont.setPointSize(16)
+        modeContentfont.setPointSize(16*self.scale_factor)
         modeContentfont.setFamily(FONT)
         modeContentfont.setItalic(True)
         self.labelModeContent = QLabel("This is a label")
@@ -899,7 +978,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def create_chords_combobox(self):
         labelFont = QFont()
-        labelFont.setPointSize(20)
+        labelFont.setPointSize(20*self.scale_factor)
         labelFont.setFamily(FONT)
         self.chordLabel = QLabel("Chords using %s strings:" % self.highStringLimit)
         self.chordLabel.setAlignment(Qt.AlignLeft)
@@ -923,13 +1002,13 @@ class CircleAndNeckVBoxFrame(QFrame):
     def create_strings_number_for_chords_buttons(self):
         up_button = QPushButton("↑", self)
         up_button.clicked.connect(lambda: self.strings_for_chord(1))
-        up_button.setMinimumWidth(30)
-        up_button.setMaximumWidth(40)
+        up_button.setMinimumWidth(30*self.scale_factor)
+        up_button.setMaximumWidth(40*self.scale_factor)
 
         down_button = QPushButton("↓", self)
         down_button.clicked.connect(lambda: self.strings_for_chord(-1))
-        down_button.setMinimumWidth(30)
-        down_button.setMaximumWidth(40)
+        down_button.setMinimumWidth(30*self.scale_factor)
+        down_button.setMaximumWidth(40*self.scale_factor)
 
         #stringsPushButtonsVBoxLayout = QVBoxLayout()
         self.chordGridLayout.addWidget(up_button, 0, 2)
@@ -941,6 +1020,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.scale_circle_background = QGraphicsItemGroup()
         self.notes_group = QGraphicsItemGroup()
         self.notes_group.setHandlesChildEvents(False)
+        self.scale_circle_background_group = QGraphicsItemGroup()
         self.scale_circle_center_group = QGraphicsItemGroup()
         self.neck_diagram_background_group = QGraphicsItemGroup()
         self.neck_diagram_notes_group = QGraphicsItemGroup()
@@ -1030,35 +1110,37 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def draw_scale_circle(self):
         center = QPointF(0, 0)
-        radius = SCALE_CIRCLE_RADIUS
+        radius = SCALE_CIRCLE_RADIUS*self.scale_factor
 
         pen = QPen(Qt.black)  # Set the pen color
-        pen.setWidth(3)      # Set the pen width
+        pen.setWidth(3*self.scale_factor)      # Set the pen width
 
         # Draw scale circle
-        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(SCALE_CIRCLE_RADIUS, SCALE_CIRCLE_RADIUS), QSizeF(2*radius, 2*radius)))
+        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(SCALE_CIRCLE_RADIUS*self.scale_factor, SCALE_CIRCLE_RADIUS*self.scale_factor), QSizeF(2*radius, 2*radius)))
         scale_circle.setBrush(Qt.white)
         scale_circle.setPen(pen)
-        self.circle_scene.addItem(scale_circle)
+        self.scale_circle_background_group.addToGroup(scale_circle)
+        if self.scale_circle_background_group not in self.circle_scene.items():
+            self.circle_scene.addItem(self.scale_circle_background_group)
 
     def draw_scale_circle_center(self):
         center = QPointF(0, 0)
 
         pen = QPen(Qt.black)  # Set the pen color
-        pen.setWidth(2)      # Set the pen width
+        pen.setWidth(2*self.scale_factor)      # Set the pen width
         pen2 = QPen(Qt.white)  # Set the pen color
-        pen2.setWidth(2)      # Set the pen width
+        pen2.setWidth(2*self.scale_factor)      # Set the pen width
 
         # Draw center circle
-        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(12, 12), QSizeF(24, 24)))
+        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(12*self.scale_factor, 12*self.scale_factor), QSizeF(24*self.scale_factor, 24*self.scale_factor)))
         scale_circle.setBrush(Qt.white)
         scale_circle.setPen(pen2)
         self.scale_circle_center_group.addToGroup(scale_circle)
-        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(10, 10), QSizeF(20, 20)))
+        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(10*self.scale_factor, 10*self.scale_factor), QSizeF(20*self.scale_factor, 20*self.scale_factor)))
         scale_circle.setBrush(Qt.white)
         scale_circle.setPen(pen)
         self.scale_circle_center_group.addToGroup(scale_circle)
-        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(5, 5), QSizeF(10, 10)))
+        scale_circle = QGraphicsEllipseItem(QRectF(center - QPointF(5*self.scale_factor, 5*self.scale_factor), QSizeF(10*self.scale_factor, 10*self.scale_factor)))
         scale_circle.setBrush(Qt.white)
         scale_circle.setPen(pen)
         self.scale_circle_center_group.addToGroup(scale_circle)
@@ -1075,30 +1157,33 @@ class CircleAndNeckVBoxFrame(QFrame):
         labelContent = DegreeLabel + " / " + self.modeName
         self.labelModeName.setText(labelContent)
         self.get_mode_composition()
-        root = QPointF(0, -SCALE_CIRCLE_RADIUS)
+        root = QPointF(0, -SCALE_CIRCLE_RADIUS*self.scale_factor)
         center = QPointF(0, 0)
-        radius = SCALE_CIRCLE_RADIUS
+        radius = SCALE_CIRCLE_RADIUS*self.scale_factor
 
         semiToneAngle = 2 * math.pi / 12
         angles = [noteInScale * semiToneAngle for noteInScale in scale]
-        noteSizes = [10 for noteInScale in scale]
+        noteSizes = [(10*self.scale_factor) for noteInScale in scale]
         noteSizes[0] = 2 * noteSizes[0]
 
         self.notesOnCircle = {noteInScale: list() for noteInScale in scale}
 
         pen = QPen(Qt.black)  # Set the pen color
-        pen.setWidth(2)      # Set the pen width
+        pen.setWidth(2*self.scale_factor)      # Set the pen width
 
         self.clear_group(self.notes_group)
         self.clear_group(self.scale_circle_center_group)
+        self.clear_group(self.scale_circle_background_group)
+
+        self.draw_scale_circle()
 
         for angle, noteSize, note in zip(angles, noteSizes, scale):
             x = center.x() + radius * math.sin(angle)
             y = center.y() - radius * math.cos(angle)
             point = QPointF(x, y)
 
-            end_of_line_x = center.x() + (radius - noteSize/2 - 5) * math.sin(angle)
-            end_of_line_y = center.y() - (radius - noteSize/2 - 5) * math.cos(angle)
+            end_of_line_x = center.x() + (radius - noteSize/2 - (5*self.scale_factor)) * math.sin(angle)
+            end_of_line_y = center.y() - (radius - noteSize/2 - (5*self.scale_factor)) * math.cos(angle)
             end_of_line_point = QPointF(end_of_line_x, end_of_line_y)
 
             x = center.x() + 1.1 * radius * math.sin(angle)
@@ -1130,30 +1215,30 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.get_chords_in_mode()
 
     def draw_neck_background(self):
-        neck_width = FRET_SPACING * (self.num_frets + 1)
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_width = FRET_SPACING * (self.num_frets + 1) *self.scale_factor
+        neck_height = STRING_SPACING * (self.num_strings - 1) *self.scale_factor
         strings_thickness = stringSets[stringGaugeFromNumberOfString[self.num_strings]]
 
         self.clear_group(self.neck_diagram_background_group)
 
         # Draw strings
         darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
-        darkGray_pen.setWidth(1)      # Set the pen width
+        darkGray_pen.setWidth(1*self.scale_factor)      # Set the pen width
 
         for i in range(self.num_strings):
-            y = i * STRING_SPACING
+            y = i * STRING_SPACING *self.scale_factor
             line = QGraphicsLineItem(0, y, neck_width, y)
-            darkGray_pen.setWidth(strings_thickness[i]/10.0)
+            darkGray_pen.setWidth((strings_thickness[i]/10.0)*self.scale_factor)
             line.setPen(darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
         # Draw frets
         darkGray_pen = QPen(Qt.darkGray)  # Set the pen color
-        darkGray_pen.setWidth(3)      # Set the pen width
+        darkGray_pen.setWidth(3*self.scale_factor)      # Set the pen width
 
         for i in range(1, self.num_frets + 1):
-            x = i * FRET_SPACING
-            line = QGraphicsLineItem(x, -5, x, neck_height+5)
+            x = i * FRET_SPACING*self.scale_factor
+            line = QGraphicsLineItem(x, -5*self.scale_factor, x, neck_height+(5*self.scale_factor))
             line.setPen(darkGray_pen)
             self.neck_diagram_background_group.addToGroup(line)
 
@@ -1168,8 +1253,8 @@ class CircleAndNeckVBoxFrame(QFrame):
         self.get_maximum_semitone_difference_in_tuning()
         self.num_frets = self.maximum_semitone_difference_in_tuning + 1
 
-        neck_width = FRET_SPACING * (self.num_frets + 1)
-        neck_height = STRING_SPACING * (self.num_strings - 1)
+        neck_width = FRET_SPACING * (self.num_frets + 1) *self.scale_factor
+        neck_height = STRING_SPACING * (self.num_strings - 1) *self.scale_factor
 
         self.draw_neck_background()
 
@@ -1180,29 +1265,31 @@ class CircleAndNeckVBoxFrame(QFrame):
 
         font = QFont()
         font.setFamily(FONT)
-        font.setPointSize(.95*(STRING_SPACING - 15))
+        font.setPointSize(.95*(STRING_SPACING - 15)*self.scale_factor)
 
         # from low to high strings
         for i in range(self.num_strings):
-            y = neck_height - (i * STRING_SPACING)
+            y = (neck_height - (i * STRING_SPACING)*self.scale_factor)
             # from low to high frets
             for j in range(1, self.num_frets):
-                x = (FRET_SPACING/2.0) + j * FRET_SPACING
+                x = ((FRET_SPACING/2.0) + j * FRET_SPACING)*self.scale_factor
                 semitone_text = (self.currentTuning[i] + j) -2
                 # If the value in semi-tone modulo 12 (whatever the octave) is part of the scale
                 if semitone_text%12 in self.shownScale:
                     point = QPointF(x, y)
                     # If the note is the root note, let's plot a triangle
+                    half_string_spacing = (STRING_SPACING/2.0)*self.scale_factor
+                    string_spacing = STRING_SPACING*self.scale_factor
                     if semitone_text%12 == 0:
                         triangle = QPolygonF()
-                        triangle.append(QPointF(STRING_SPACING/2.0, 0))  # Top point
-                        triangle.append(QPointF(STRING_SPACING, STRING_SPACING))  # Bottom right point
-                        triangle.append(QPointF(0, STRING_SPACING))  # Bottom left point
+                        triangle.append(QPointF(half_string_spacing, 0))  # Top point
+                        triangle.append(QPointF(string_spacing, string_spacing))  # Bottom right point
+                        triangle.append(QPointF(0, string_spacing))  # Bottom left point
                         note_point = TriangleNoteItem(triangle, embeddingWidget=self)
-                        note_point.setPos(x-STRING_SPACING/2.0, y-STRING_SPACING/2.0)
+                        note_point.setPos(x-half_string_spacing, y-half_string_spacing)
                     # else, let's plot a simple circle
                     else:
-                        note_point = NoteItem(QRectF(point - QPointF(STRING_SPACING/2.0, STRING_SPACING/2.0), QSizeF(STRING_SPACING, STRING_SPACING)), embeddingWidget=self)
+                        note_point = NoteItem(QRectF(point - QPointF(half_string_spacing, half_string_spacing), QSizeF(string_spacing, string_spacing)), embeddingWidget=self)
                     # We record the symbol object, its note value and string and fret positions by note semi-tone value in the scale
                     note_point.note = semitone_text%12
                     note_point.colour = self.notesOnCircle[note_point.note][0][2]
@@ -1433,7 +1520,7 @@ class CircleAndNeckVBoxFrame(QFrame):
 
     def changeColourDegrees(self, colour):
         self.colour_degrees = colour
-        self.refresh()
+        self.refresh(scale_factor=self.scale_factor)
 
     def get_positions_of_chord_notes(self, chord):
         notes_positions = {}
@@ -1510,7 +1597,7 @@ class CircleAndNeckVBoxFrame(QFrame):
         gray_pen = QPen(Qt.gray)
         trans_pen = QPen(Qt.transparent)
 
-        #print(chord_positions[chordIndex])
+        #print(chord_positions[self.chordIndex])
 
         for (string, note, fret, note_marker, note_label) in chord_positions[self.chordIndex][1]:
             note_marker.setBrush(Qt.white)
@@ -1527,18 +1614,41 @@ class CircleAndNeckVBoxFrame(QFrame):
         # Calculate the center point of the bounding rectangle
         center = rect.center()
         # Set the size of the viewport
-        self.neck_graphics_view.viewport().setFixedSize(GRAPHICSVIEW_WIDTH, GRAPHICSVIEW_HEIGHT)
+        self.neck_graphics_view.viewport().setFixedSize(GRAPHICSVIEW_WIDTH*self.scale_factor, GRAPHICSVIEW_HEIGHT*self.scale_factor)
         view_size = self.neck_graphics_view.viewport().size()
         # Calculate the new position for the scene
         scene_pos = center - QPointF(view_size.width() / 2, view_size.height() / 2)
         # Set the new position for the scene
         self.neck_scene.setSceneRect(scene_pos.x(), scene_pos.y(), view_size.width(), view_size.height())
 
-    def refresh(self):
+    def center_scale_view(self):
+        # Get the bounding rectangle of all items in the scene
+        rect = self.circle_scene.itemsBoundingRect()
+        # Calculate the center point of the bounding rectangle
+        center = rect.center()
+        # Set the size of the viewport
+        self.circle_graphics_view.viewport().setFixedSize(GRAPHICSVIEW_WIDTH*self.scale_factor, GRAPHICSVIEW_HEIGHT*self.scale_factor)
+        view_size = self.circle_graphics_view.viewport().size()
+        # Calculate the new position for the scene
+        scene_pos = center - QPointF(view_size.width() / 2, view_size.height() / 2)
+        # Set the new position for the scene
+        self.circle_scene.setSceneRect(scene_pos.x(), scene_pos.y(), view_size.width(), view_size.height())
+
+    def refresh(self, scale_factor=1.0):
+        print("scale_factor: %s" % scale_factor)
+        self.scale_factor = scale_factor
+        self.circle_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH*self.scale_factor, GRAPHICSVIEW_HEIGHT*self.scale_factor)
+        self.circle_graphics_view.viewport().update()
+        self.neck_graphics_view.setFixedSize(GRAPHICSVIEW_WIDTH*self.scale_factor, GRAPHICSVIEW_HEIGHT*self.scale_factor)
+        self.neck_graphics_view.viewport().update()
+        self.thisVBoxLayout.update()
+        self.centralHBoxLayout.update()
+        self.update()
         self.draw_scale()
         self.draw_notes_on_neck()
         self.get_chords_in_mode()
         self.center_neck_view()
+        self.center_scale_view()
 
 # -----------------------------------------------------------------------------
 
@@ -1582,11 +1692,11 @@ class CircleAndNeckVBoxFrame(QFrame):
     @Slot()
     def show_alternate_chord(self):
         self.color_notes_by_default()
-        print("chordIndex: %s" % self.chordIndex)
-        print("len(self.chord_positions): %s" % len(self.chord_positions))
+        #print("chordIndex: %s" % self.chordIndex)
+        #print("len(self.chord_positions): %s" % len(self.chord_positions))
 
         self.chordIndex = (self.chordIndex+1)%len(self.chord_positions)
-        print("chordIndex: %s" % self.chordIndex)
+        #print("chordIndex: %s" % self.chordIndex)
 
         self.color_chord_notes(self.chords_combobox.currentData())
 
@@ -1608,9 +1718,13 @@ class CircleAndNeckVBoxFrame(QFrame):
 # -----------------------------------------------------------------------------
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, scale_factor=1.0):
         super().__init__()
-        self.setWindowTitle("🎸 Scales Circle Diagram")
+
+        self.scale_factor = scale_factor
+        self.last_scale_Factor = scale_factor
+        self.initUI()
+
         self.neckGeneralView = ''
 
         self.scaleName = ""
@@ -1625,7 +1739,7 @@ class MainWindow(QMainWindow):
         self.colour_degrees = DEGREE_COLOUR
 
         self.labelFont = QFont()
-        self.labelFont.setPointSize(20)
+        self.labelFont.setPointSize(20*self.scale_factor)
         self.labelFont.setFamily(FONT)
 
         self.create_gui()
@@ -1641,6 +1755,9 @@ class MainWindow(QMainWindow):
         self.set_tuning("Standard 6 \tEADGBE")
 
 # -----------------------------------------------------------------------------
+
+    def initUI(self):
+        self.setWindowTitle("🎸 Scales Circle Diagram")
 
     def create_gui(self):
         # Set a main widget
@@ -1663,6 +1780,7 @@ class MainWindow(QMainWindow):
         # a second horizontal layout for the max four degrees
         self.midHBoxLayout = QHBoxLayout()
         self.mainVBoxLayout.addLayout(self.midHBoxLayout)
+        #print(self.mainVBoxLayout.getStyleSheet())
 
     def create_scale_combobox(self, parentLayout):
         '''
@@ -1671,6 +1789,7 @@ class MainWindow(QMainWindow):
         label = QLabel("Scale:")
         label.setAlignment(Qt.AlignLeft)
         label.setFont(self.labelFont)
+        #label.originalFontSize = 20
         self.scales_combobox = QComboBox()
         self.scales_combobox.addItems(scales.keys())
         self.scales_combobox.currentTextChanged.connect(lambda: self.set_scale(self.scales_combobox.currentText()))
@@ -1687,6 +1806,7 @@ class MainWindow(QMainWindow):
         label = QLabel("Mode:")
         label.setAlignment(Qt.AlignLeft)
         label.setFont(self.labelFont)
+        #label.originalFontSize = 20
         self.mode_combobox = QComboBox()
         self.add_compatible_modes_in_Combobox()
         self.mode_combobox.currentTextChanged.connect(lambda: self.set_mode(self.mode_combobox.currentText(), self.mode_combobox.currentIndex()))
@@ -1704,6 +1824,7 @@ class MainWindow(QMainWindow):
         label = QLabel("Arrangmt:")
         label.setAlignment(Qt.AlignLeft)
         label.setFont(self.labelFont)
+        #label.originalFontSize = 20
         self.arrangement_combobox = QComboBox()
         self.add_arrangements_to_combobox()
         self.arrangement_combobox.currentTextChanged.connect(lambda: self.set_arrangement(self.arrangement_combobox.currentText(), self.arrangement_combobox.currentIndex()))
@@ -1716,6 +1837,7 @@ class MainWindow(QMainWindow):
         label = QLabel("Tuning:")
         label.setAlignment(Qt.AlignLeft)
         label.setFont(self.labelFont)
+        #label.originalFontSize = 20
         self.tunings_combobox = QComboBox()
         self.tunings_combobox.addItems(tunings.keys())
         self.tunings_combobox.setCurrentText("Standard 6 \tEADGBE")
@@ -1792,10 +1914,12 @@ class MainWindow(QMainWindow):
             self.neckGeneralView.set_mode(modeIndex)
 
     def set_arrangement(self, arrangement, arrIndex):
+        height = 500*self.scale_factor
+        width = 940*self.scale_factor
         self.arrangementString = arrangement
         self.arrangement = degreeArrangements[arrIndex]
         self.clearDegreeFrames()
-        self.setFixedSize(500*len(self.arrangement), 940)
+        self.setFixedSize(height * len(self.arrangement), width)
         for i in range(len(self.arrangement)):
             name = "frame_%s"%(1+i)
             vFrame = self.addDegreeFrame(name=name)
@@ -1823,9 +1947,11 @@ class MainWindow(QMainWindow):
         self.degreesFrames = list()
 
     def addDegreeFrame(self, visible=False, name=""):
-        vBoxFrame = CircleAndNeckVBoxFrame(self, 1, visible=visible, name=name)
+        width = 483*self.scale_factor
+        height = 854*self.scale_factor
+        vBoxFrame = CircleAndNeckVBoxFrame(self, 1, visible=visible, name=name, scale_factor=self.scale_factor)
         self.degreesFrames.append(vBoxFrame)
-        vBoxFrame.setFixedSize(483, 854)
+        vBoxFrame.setFixedSize(width, height)
         self.midHBoxLayout.addWidget(vBoxFrame)
         return vBoxFrame
 
@@ -1843,21 +1969,137 @@ class MainWindow(QMainWindow):
             else:
                 self.neckGeneralView.show()
         else:
-            self.neckGeneralView = NeckWindow(self)
+            self.create_neck_general_view()
+        self.neckGeneralView.refresh(scale_factor=self.scale_factor)
+
+    def create_neck_general_view(self):
+        width = 1500*self.scale_factor
+        height = 440*self.scale_factor
+        self.neckGeneralView = NeckWindow(self, scale_factor=self.scale_factor)
+        self.refresh()
+        self.neckGeneralView.set_scale(self.scaleName)
+        self.neckGeneralView.set_tuning(self.currentTuningName, init=True)
+        self.neckGeneralView.set_mode(self.modeIndex)
+        self.neckGeneralView.set_arrangement(self.arrangement)
+        self.neckGeneralView.setFixedSize(width, height)
+        self.neckGeneralView.show()
+
+    def keyPressEvent(self, event):
+        print("event.key: %s" % event.key())
+        if event.key() == 43:
+            print("scale up")
+            self.last_scale_Factor = self.scale_factor
+            self.scale_factor += .1
+            #self.zoomIn()
             self.refresh()
-            self.neckGeneralView.set_scale(self.scaleName)
-            self.neckGeneralView.set_tuning(self.currentTuningName, init=True)
-            self.neckGeneralView.set_mode(self.modeIndex)
-            self.neckGeneralView.set_arrangement(self.arrangement)
-            self.neckGeneralView.setFixedSize(1340, 440)
-            self.neckGeneralView.show()
-        self.neckGeneralView.refresh()
+        elif event.key() == 95:
+            print("scale down")
+            self.last_scale_Factor = self.scale_factor
+            self.scale_factor -= .1
+            #self.zoomOut()
+            self.refresh()
+        else:
+            super().keyPressEvent(event)
+
+    def scale_all_labels(self):
+        relative_scale_factor = self.scale_factor/self.last_scale_Factor
+        for widget in self.findChildren(QLabel):
+            font = widget.font()
+            if hasattr(widget, 'originalFontSize'):
+                original_point_size = widget.originalFontSize
+                if original_point_size > 0:  # If a point size is set
+                    font.setPointSizeF(original_point_size * self.scale_factor)
+                    widget.setFont(font)
+            else:
+                original_point_size = font.pointSize()
+                if original_point_size > 0:  # If a point size is set
+                    font.setPointSizeF(original_point_size * relative_scale_factor)
+                    widget.setFont(font)
+            widget.setStyleSheet(f"padding: {int(5 * relative_scale_factor)}px; margin: {int(5 * relative_scale_factor)}px;")
+
+    def scale_all_comboboxes(self):
+        relative_scale_factor = self.scale_factor/self.last_scale_Factor
+        for widget in self.findChildren(QComboBox):
+            #print("treating QCombobox: %s" % widget)
+            new_width = widget.size().width() * relative_scale_factor
+            new_height = widget.size().height() * relative_scale_factor
+            '''
+            font = widget.font()
+            original_point_size = font.pointSize()
+            if original_point_size > 0:  # If a point size is set
+                print("original_point_size > 0")
+                font.setPointSize(original_point_size * self.scale_factor/self.last_scale_Factor)
+                widget.setFont(font)
+            '''
+            print("widget.style elements: %s" % dir(widget.style()))
+            print("widget.style layout spacing: %s" % widget.style().__getattribute__('layoutSpacing'))
+
+            #widget.setStyleSheet(f"padding: {int(5 * relative_scale_factor)}px; margin: {int(5 * relative_scale_factor)}px;")
+
+            widget.setFixedSize(new_width, new_height)
+
+    def scale_all_pushbuttons(self):
+        for widget in self.findChildren(QPushButton):
+            print("scale_all_pushbuttons: %s" % widget)
+            font = widget.font()
+            font_metrics = QFontMetrics(font)
+            original_point_size = font_metrics.height()
+            print(original_point_size)
+            if original_point_size > 0:  # If a point size is set
+                font.setPointSize(int(original_point_size * self.scale_factor/self.last_scale_Factor))
+                widget.setFont(font)
+            relative_scale_factor = self.scale_factor/self.last_scale_Factor
+            widget.setStyleSheet(f"padding: {int(5 * relative_scale_factor)}px; margin: {int(5 * relative_scale_factor)}px;")
+
+    def find_all_layouts(self):
+        layouts = []
+
+        def _find_layouts(w):
+            # Check if the widget has a layout
+            layout = w.layout()
+            if layout:
+                layouts.append(layout)
+                # Recursively find layouts in child widgets
+                for i in range(layout.count()):
+                    item = layout.itemAt(i)
+                    if item.widget():
+                        _find_layouts(item.widget())
+                    elif item.layout():
+                        layouts.append(item.layout())
+
+        _find_layouts(self)
+        return layouts
+
+    def scale_spacings(self):
+        layouts = self.find_all_layouts()
+        for layout in layouts:
+            current_spacing = layout.spacing()
+            layout.setSpacing(current_spacing* self.scale_factor/self.last_scale_Factor)
 
     def refresh(self):
-        for vFrame in self.degreesFrames:
-            vFrame.refresh()
+        width = 510 * self.scale_factor
+        height = 940 * self.scale_factor
+        self.labelFont.setPointSize(20*self.scale_factor)
+        #self.scale_all_labels()
+        #self.scale_all_comboboxes()
+        #self.scale_all_pushbuttons()
+        #self.scale_spacings()
+        self.setFixedSize(width, height)
+        self.update()
+
+        self.central_widget.update()
+
+        currentArrangement = self.arrangement_combobox.currentText()
+        currentArrangementIndex = self.arrangement_combobox.currentIndex()
+        self.set_arrangement('II', 1)
+        #for vFrame in self.degreesFrames:
+        #    vFrame.refresh(scale_factor=self.scale_factor)
+        self.set_arrangement(currentArrangement, currentArrangementIndex)
         if not self.neckGeneralView == '':
-            self.neckGeneralView.refresh()
+            width = 1500*self.scale_factor
+            height = 440*self.scale_factor
+            self.neckGeneralView.setFixedSize(width, height)
+            self.neckGeneralView.refresh(scale_factor=self.scale_factor)
 
     def closeEvent(self, event):
         if not self.neckGeneralView == '':
@@ -1876,10 +2118,13 @@ class MainWindow(QMainWindow):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    app = QApplication([])
-    window = MainWindow()
-    window.setFixedSize(510, 940)
+    app = QApplication(sys.argv)
+    scale_factor = 1.0
+    window = MainWindow(scale_factor=scale_factor)
+    width = 510 * scale_factor
+    height = 940 * scale_factor
+    window.setFixedSize(width, height)
     window.show()
-    app.exec()
+    sys.exit(app.exec())
 
 # -----------------------------------------------------------------------------

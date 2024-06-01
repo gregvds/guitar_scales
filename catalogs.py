@@ -139,16 +139,16 @@ chords = {
 enrichments = {
 "M": ({"semitones": (14,), "notation": "M9"},),
 "m": ({"semitones": (14,), "notation": "m9"},),
-"7": ({"semitones": (13,), "notation": "9♭"},{"semitones": (14,), "notation": "9"},{"semitones": (15,), "notation": "9♯"},{"semitones": (18,), "notation": "11♯"}),
-"m7": ({"semitones": (14,), "notation": "m9"},{"semitones": (17,), "notation": "m11"}),
-"7sus": ({"semitones": (13,), "notation": "sus9♭"},{"semitones": (14,), "notation": "sus9"}),
-"7maj": ({"semitones": (14,), "notation": "7maj9"},{"semitones": (18,), "notation": "7maj11♯"}),
-"m7maj": ({"semitones": (14,), "notation": "m7maj9"},{"semitones": (18,), "notation": "m7maj11♯"}),
+"7": ({"semitones": (13,), "notation": "9♭"},{"semitones": (14,), "notation": "9"},{"semitones": (15,), "notation": "9♯"},{"semitones": (18,), "notation": "11♯"},{"semitones": (20,), "notation": "♭13"},{"semitones": (21,), "notation": "13"}),
+"m7": ({"semitones": (14,), "notation": "m9"},{"semitones": (17,), "notation": "m11"},{"semitones": (21,), "notation": "m13"}),
+"7sus": ({"semitones": (13,), "notation": "sus9♭"},{"semitones": (14,), "notation": "sus9"},{"semitones": (21,), "notation": "sus13"}),
+"7maj": ({"semitones": (14,), "notation": "7maj9"},{"semitones": (18,), "notation": "7maj11♯"},{"semitones": (21,), "notation": "7maj13"}),
+"m7maj": ({"semitones": (14,), "notation": "m7maj9"},{"semitones": (18,), "notation": "m7maj11♯"},{"semitones": (21,), "notation": "m7maj13"}),
 "7maj♯5": ({"semitones": (14,), "notation": "m7maj♯59"},{"semitones": (18,), "notation": "m7maj♯511♯"}),
 "7♯5": ({"semitones": (13,), "notation": "9♭"},{"semitones": (14,), "notation": "9"},{"semitones": (15,), "notation": "9♯"},{"semitones": (18,), "notation": "11♯"}),
-"7♭5": ({"semitones": (13,), "notation": "7♭5♭9"},{"semitones": (14,), "notation": "7♭59"},{"semitones": (15,), "notation": "7♭5♯9"}),
+"7♭5": ({"semitones": (13,), "notation": "7♭5♭9"},{"semitones": (14,), "notation": "7♭59"},{"semitones": (15,), "notation": "7♭5♯9"},{"semitones": (20,), "notation": "7♭5♭13"},{"semitones": (21,), "notation": "7♭513"}),
 "m7♭5": ({"semitones": (14,), "notation": "m7♭5m9"},{"semitones": (17,), "notation": "m7♭5m11"}),
-"dim7": ({"semitones": (14,), "notation": "dim7m9"},{"semitones": (17,), "notation": "dim7m11"})
+"dim7": ({"semitones": (14,), "notation": "dim7m9"},{"semitones": (17,), "notation": "dim7m11"},{"semitones": (20,), "notation": "dim7m♭13"})
 }
 
 tunings = {
