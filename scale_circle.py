@@ -532,7 +532,10 @@ class NeckWindow(QDialog):
         noteRadius = (STRING_SPACING / 2.0) *self.scale_factor
         halfNeckHeight = neck_height/2
 
-        zeroFretNoteXadjustment = 13*self.scale_factor
+        if self.reg_frets_checkbox.isChecked():
+            zeroFretNoteXadjustment = 15.2*self.scale_factor
+        else:
+            zeroFretNoteXadjustment = 39.8*self.scale_factor
 
         base   = FRET_SPACING * self.scale_factor
         height = neck_height * 20
@@ -688,7 +691,7 @@ class NeckWindow(QDialog):
                     xLeft = x
                 else:
                     xLeft = x - thisFretSpacing/2.0
-                print('xleft: %s'%xLeft)
+                #print('xleft: %s'%xLeft)
                 xRight = x+thisFretSpacing/2.0
 
             xTopLeft = self.transFan(xLeft, yTop)
